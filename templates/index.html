@@ -220,22 +220,22 @@
   </div>
   <div class="right">
     <div class="sec"><div class="sec-title">🍶 銘柄情報</div>
-      <input type="text" id="t_name" placeholder="銘柄名（例：而今 純米吟醸）" oninput="tSchedPrev()">
+      <input type="text" id="t_name" placeholder="銘柄名（例：而今 純米吟醸）" onchange="tOnRelease()" onkeydown="if(event.key==='Enter')tOnRelease()">
     </div>
     <div class="sec"><div class="sec-title">📊 テイスティングスコア（各 1〜5）</div>
       <div class="taste-grid">
-        <div class="taste-item"><div class="taste-lbl">甘味 <span id="v甘味">5</span></div><input type="range" data-key="甘味" min="1" max="10" step="1" value="5" oninput="tsl(this)"></div>
-        <div class="taste-item"><div class="taste-lbl">酸味 <span id="v酸味">5</span></div><input type="range" data-key="酸味" min="1" max="10" step="1" value="5" oninput="tsl(this)"></div>
-        <div class="taste-item"><div class="taste-lbl">旨味 <span id="v旨味">5</span></div><input type="range" data-key="旨味" min="1" max="10" step="1" value="5" oninput="tsl(this)"></div>
-        <div class="taste-item"><div class="taste-lbl">苦味 <span id="v苦味">5</span></div><input type="range" data-key="苦味" min="1" max="10" step="1" value="5" oninput="tsl(this)"></div>
-        <div class="taste-item"><div class="taste-lbl">渋み <span id="v渋み">5</span></div><input type="range" data-key="渋み" min="1" max="10" step="1" value="5" oninput="tsl(this)"></div>
-        <div class="taste-item"><div class="taste-lbl">香り <span id="v香り">5</span></div><input type="range" data-key="香り" min="1" max="10" step="1" value="5" oninput="tsl(this)"></div>
+        <div class="taste-item"><div class="taste-lbl">甘味 <span id="v甘味">5</span></div><input type="range" data-key="甘味" min="1" max="10" step="1" value="5" oninput="tsl(this)" onchange="tOnRelease()"></div>
+        <div class="taste-item"><div class="taste-lbl">酸味 <span id="v酸味">5</span></div><input type="range" data-key="酸味" min="1" max="10" step="1" value="5" oninput="tsl(this)" onchange="tOnRelease()"></div>
+        <div class="taste-item"><div class="taste-lbl">旨味 <span id="v旨味">5</span></div><input type="range" data-key="旨味" min="1" max="10" step="1" value="5" oninput="tsl(this)" onchange="tOnRelease()"></div>
+        <div class="taste-item"><div class="taste-lbl">苦味 <span id="v苦味">5</span></div><input type="range" data-key="苦味" min="1" max="10" step="1" value="5" oninput="tsl(this)" onchange="tOnRelease()"></div>
+        <div class="taste-item"><div class="taste-lbl">渋み <span id="v渋み">5</span></div><input type="range" data-key="渋み" min="1" max="10" step="1" value="5" oninput="tsl(this)" onchange="tOnRelease()"></div>
+        <div class="taste-item"><div class="taste-lbl">香り <span id="v香り">5</span></div><input type="range" data-key="香り" min="1" max="10" step="1" value="5" oninput="tsl(this)" onchange="tOnRelease()"></div>
       </div>
     </div>
     <div class="sec"><div class="sec-title">📍 チャートの位置・サイズ</div>
-      <div class="row"><span class="lbl">横位置</span><input type="range" id="t_chart_x" min="10" max="90" step="1" value="50" oninput="tslPos(this,'t_chart_x','チャート横')"><span class="val" id="vt_chart_x">50%</span></div>
-      <div class="row"><span class="lbl">縦位置</span><input type="range" id="t_chart_y" min="20" max="95" step="1" value="55" oninput="tslPos(this,'t_chart_y','チャート縦')"><span class="val" id="vt_chart_y">55%</span></div>
-      <div class="row"><span class="lbl">サイズ</span><input type="range" id="t_chart_size" min="30" max="95" step="1" value="75" oninput="tslPos(this,'t_chart_size','チャートサイズ')"><span class="val" id="vt_chart_size">75%</span></div>
+      <div class="row"><span class="lbl">横位置</span><input type="range" id="t_chart_x" min="10" max="90" step="1" value="50" oninput="tslPos(this,'t_chart_x','チャート横')" onchange="tOnRelease()"><span class="val" id="vt_chart_x">50%</span></div>
+      <div class="row"><span class="lbl">縦位置</span><input type="range" id="t_chart_y" min="20" max="95" step="1" value="55" oninput="tslPos(this,'t_chart_y','チャート縦')" onchange="tOnRelease()"><span class="val" id="vt_chart_y">55%</span></div>
+      <div class="row"><span class="lbl">サイズ</span><input type="range" id="t_chart_size" min="30" max="95" step="1" value="75" oninput="tslPos(this,'t_chart_size','チャートサイズ')" onchange="tOnRelease()"><span class="val" id="vt_chart_size">75%</span></div>
     </div>
     <div class="sec"><div class="sec-title">✍️ キャプション自動生成</div>
       <button class="btn-auto" id="tCapBtn" disabled onclick="genCaption('tasting')" style="margin-bottom:8px">
@@ -247,10 +247,10 @@
       </div>
     </div>
     <div class="sec"><div class="sec-title">✍️ 銘柄名の位置・サイズ・色</div>
-      <div class="row"><span class="lbl">横位置</span><input type="range" id="t_name_x" min="5" max="95" step="1" value="50" oninput="tslPos(this,'t_name_x','名前横')"><span class="val" id="vt_name_x">50%</span></div>
-      <div class="row"><span class="lbl">縦位置</span><input type="range" id="t_name_y" min="2" max="90" step="1" value="10" oninput="tslPos(this,'t_name_y','名前縦')"><span class="val" id="vt_name_y">10%</span></div>
-      <div class="row"><span class="lbl">文字サイズ</span><input type="range" id="t_name_size" min="20" max="160" step="2" value="82" oninput="tslPos(this,'t_name_size','名前サイズ')"><span class="val" id="vt_name_size">82</span></div>
-      <div class="row"><span class="lbl">文字の色</span><input type="color" id="t_name_color" value="#ffffff" oninput="tSchedPrev()"></div>
+      <div class="row"><span class="lbl">横位置</span><input type="range" id="t_name_x" min="5" max="95" step="1" value="50" oninput="tslPos(this,'t_name_x','名前横')" onchange="tOnRelease()"><span class="val" id="vt_name_x">50%</span></div>
+      <div class="row"><span class="lbl">縦位置</span><input type="range" id="t_name_y" min="2" max="90" step="1" value="10" oninput="tslPos(this,'t_name_y','名前縦')" onchange="tOnRelease()"><span class="val" id="vt_name_y">10%</span></div>
+      <div class="row"><span class="lbl">文字サイズ</span><input type="range" id="t_name_size" min="20" max="160" step="2" value="82" oninput="tslPos(this,'t_name_size','名前サイズ')" onchange="tOnRelease()"><span class="val" id="vt_name_size">82</span></div>
+      <div class="row"><span class="lbl">文字の色</span><input type="color" id="t_name_color" value="#ffffff" onchange="tOnRelease()"></div>
       <div class="row" style="justify-content:space-between"><span style="font-size:13px;color:var(--muted)">影をつける</span><label class="toggle"><input type="checkbox" id="t_name_shadow" checked onchange="tSchedPrev()"><div class="tog"></div></label></div>
     </div>
   </div>
@@ -392,21 +392,19 @@ async function cPreview(silent=false){
 function cDl(){dlBlob("/download_cover",cGetParams(),"cover.jpg");}
 
 // ════ TAB3: テイスティング ════
-let tHasImg=false, tPrevTimer=null, tCtrl=null;
+let tHasImg=false, tRequesting=false;
 
 function tsl(el){
   const k=el.dataset.key; document.getElementById("v"+k).textContent=el.value;
-  tSchedPrev();
 }
 function tslPos(el, id, label){
   document.getElementById("v"+id).textContent=el.value+(label.includes("サイズ")?"":"%");
-  tSchedPrev();
 }
 async function tUpload(file){
   spin(true); const fd=new FormData(); fd.append("image",file);
   const d=await(await fetch("/upload_tasting",{method:"POST",body:fd})).json();
   spin(false);
-  if(d.preview){showPrev("tPrev","tZone",d.preview);tHasImg=true;document.getElementById("tDlBtn").disabled=false;document.getElementById("tCapBtn").disabled=false;tSchedPrev();}
+  if(d.preview){showPrev("tPrev","tZone",d.preview);tHasImg=true;document.getElementById("tDlBtn").disabled=false;document.getElementById("tCapBtn").disabled=false;tDoPreview();}
 }
 document.getElementById("tZone").addEventListener("click",()=>{if(!tHasImg)document.getElementById("tFile").click();});
 
@@ -427,16 +425,17 @@ function tGetParams(){
     name_shadow: g("t_name_shadow").checked ? "true" : "false",
   };
 }
-function tSchedPrev(){
-  if(!tHasImg)return; clearTimeout(tPrevTimer); tPrevTimer=setTimeout(tDoPreview,300);
+function tOnRelease(){
+  if(!tHasImg)return; tDoPreview();
 }
 async function tDoPreview(){
-  if(tCtrl)tCtrl.abort(); tCtrl=new AbortController();
-  setUpdating("tZone",true);
+  if(!tHasImg||tRequesting)return;
+  tRequesting=true; setUpdating("tZone",true);
   try{
-    const d=await(await fetch("/preview_tasting",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(tGetParams()),signal:tCtrl.signal})).json();
+    const d=await(await fetch("/preview_tasting",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(tGetParams())})).json();
     if(d.preview)showPrev("tPrev","tZone",d.preview);
-  }catch(e){if(e.name!=="AbortError")console.error(e); setUpdating("tZone",false);}
+  }catch(e){console.error(e); setUpdating("tZone",false);}
+  tRequesting=false;
 }
 async function tPreview(){ tDoPreview(); }
 function tDl(){dlBlob("/download_tasting",tGetParams(),"tasting.jpg");}
