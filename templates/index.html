@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <title>🍶 インスタ画像エディター</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0a0a0a; --card: #181818; --border: #2c2c2c;
+      --accent: #c9a96e; --purple: #8b5cf6; --text: #f0f0f0; --muted: #777;
+    }
+    body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif; font-size: 14px; }
+
+    /* ── ヘッダー ── */
+    header {
+      background: var(--card); border-bottom: 1px solid var(--border);
+      padding: 10px 16px; display: flex; align-items: center; gap: 10px;
+      position: sticky; top: 0; z-index: 100;
+    }
+    header h1 { font-size: 15px; font-weight: 700; color: var(--accent); }
+    .spinner { width: 18px; height: 18px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin .7s linear infinite; display: none; margin-left: auto; }
+    .spinner.on { display: block; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── レイアウト ── */
+    .layout { display: flex; min-height: calc(100vh - 45px); }
+    .left { width: 340px; flex-shrink: 0; padding: 14px; border-right: 1px solid var(--border); display: flex; flex-direction: column; gap: 12px; }
+    .right { flex: 1; padding: 14px; overflow-y: auto; display: flex; flex-direction: column; gap: 18px; }
+
+    /* ── アップロードゾーン ── */
+    .upload-zone {
+      width: 100%; aspect-ratio: 4/5; border: 2px dashed var(--border);
+      border-radius: 12px; display: flex; flex-direction: column; align-items: center;
+      justify-content: center; cursor: pointer; overflow: hidden; position: relative;
+      background: var(--card); transition: border-color .2s;
+    }
+    .upload-zone:hover, .upload-zone.drag { border-color: var(--accent); }
+    .upload-zone img { width: 100%; height: 100%; object-fit: cover; display: none; }
+    .upload-zone.loaded img { display: block; }
+    .upload-zone.loaded .ph { display: none; }
+    .ph { display: flex; flex-direction: column; align-items: center; gap: 8px; color: var(--muted); pointer-events: none; }
+    .ph .ico { font-size: 36px; }
+    .ph p { font-size: 12px; text-align: center; line-height: 1.6; }
+
+    /* ── ボタン群 ── */
+    .btn-row { display: flex; gap: 8px; }
+    .btn { flex: 1; padding: 9px 8px; border: none; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; transition: opacity .15s, transform .1s; }
+    .btn:active { transform: scale(.96); }
+    .btn-open { background: var(--card); color: var(--text); border: 1px solid var(--border); }
+    .btn-reset { background: var(--card); color: var(--muted); border: 1px solid var(--border); }
+
+    /* ── 自動最適化ボタン ── */
+    .btn-auto {
+      width: 100%; padding: 13px; border: none; border-radius: 10px;
+      background: linear-gradient(135deg, #6d28d9, #8b5cf6);
+      color: white; font-size: 14px; font-weight: 700; cursor: pointer;
+      transition: opacity .2s, transform .1s;
+    }
+    .btn-auto:disabled { opacity: .35; cursor: default; }
+    .btn-auto:not(:disabled):active { transform: scale(.97); }
+    .btn-auto .hint { font-size: 11px; font-weight: 400; opacity: .8; display: block; margin-top: 2px; }
+
+    /* ── 保存ボタン ── */
+    .btn-dl {
+      width: 100%; padding: 13px; border: none; border-radius: 10px;
+      background: linear-gradient(135deg, var(--accent), #a07840);
+      color: #000; font-size: 14px; font-weight: 700; cursor: pointer;
+      transition: opacity .2s, transform .1s;
+    }
+    .btn-dl:disabled { opacity: .35; cursor: default; }
+    .btn-dl:not(:disabled):active { transform: scale(.97); }
+
+    /* ── セクション／スライダー ── */
+    .sec { display: flex; flex-direction: column; gap: 9px; }
+    .sec-title { font-size: 11px; font-weight: 700; letter-spacing: .07em; color: var(--accent); text-transform: uppercase; padding-bottom: 6px; border-bottom: 1px solid var(--border); }
+    .row { display: flex; align-items: center; gap: 8px; }
+    .lbl { width: 80px; flex-shrink: 0; font-size: 12px; color: var(--muted); }
+    input[type="range"] { flex: 1; -webkit-appearance: none; height: 3px; background: var(--border); border-radius: 2px; outline: none; transition: background .3s; }
+    input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%; background: var(--accent); cursor: pointer; transition: transform .1s; }
+    input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.2); }
+    .val { width: 38px; text-align: right; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+    /* スライダーアニメーション */
+    input[type="range"].animating { transition: value .4s; }
+
+    /* ── クロップ ── */
+    .crop-row { display: flex; gap: 6px; }
+    .crop-btn { flex: 1; padding: 8px 4px; border-radius: 8px; border: 1px solid var(--border); background: var(--card); color: var(--muted); font-size: 12px; cursor: pointer; text-align: center; transition: .15s; }
+    .crop-btn.on { border-color: var(--accent); color: var(--accent); background: rgba(201,169,110,.12); }
+
+    /* ── テキスト ── */
+    textarea { width: 100%; padding: 10px; background: var(--card); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 14px; resize: vertical; min-height: 68px; outline: none; font-family: inherit; line-height: 1.5; }
+    textarea:focus { border-color: var(--accent); }
+    .color-row { display: flex; align-items: center; gap: 10px; }
+    .color-row .lbl { flex: 1; width: auto; }
+    input[type="color"] { width: 38px; height: 34px; border: none; border-radius: 6px; cursor: pointer; padding: 2px; background: var(--card); }
+    .toggle-row { display: flex; align-items: center; justify-content: space-between; }
+    .toggle { position: relative; width: 40px; height: 22px; }
+    .toggle input { display: none; }
+    .tog-track { position: absolute; inset: 0; background: var(--border); border-radius: 11px; cursor: pointer; transition: .2s; }
+    .toggle input:checked + .tog-track { background: var(--accent); }
+    .tog-track::after { content: ""; position: absolute; left: 3px; top: 3px; width: 16px; height: 16px; border-radius: 50%; background: white; transition: .2s; }
+    .toggle input:checked + .tog-track::after { left: 21px; }
+
+    /* ── トースト ── */
+    #toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(60px); background: #222; color: white; padding: 10px 20px; border-radius: 24px; font-size: 13px; opacity: 0; transition: opacity .3s, transform .3s; z-index: 999; white-space: nowrap; }
+    #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+    /* ── モバイル ── */
+    @media (max-width: 680px) {
+      .layout { flex-direction: column; }
+      .left { width: 100%; border-right: none; border-bottom: 1px solid var(--border); }
+      .upload-zone { max-height: 72vw; }
+      .lbl { width: 64px; }
+    }
+  </style>
+</head>
+<body>
+<header>
+  <span style="font-size:20px">🍶</span>
+  <div><h1>インスタ画像エディター</h1></div>
+  <div class="spinner" id="spinner"></div>
+</header>
+
+<div class="layout">
+  <!-- ===== 左：プレビュー ===== -->
+  <div class="left">
+    <div class="upload-zone" id="zone">
+      <img id="prev" alt="preview">
+      <div class="ph">
+        <div class="ico">📷</div>
+        <p>タップして写真を選択<br><small>またはドラッグ&ドロップ</small></p>
+      </div>
+    </div>
+    <input type="file" id="filePick" accept="image/*" style="display:none">
+
+    <div class="btn-row">
+      <button class="btn btn-open" onclick="document.getElementById('filePick').click()">📂 写真を開く</button>
+      <button class="btn btn-reset" onclick="resetAll()">↩ リセット</button>
+    </div>
+
+    <!-- 自動最適化 -->
+    <button class="btn-auto" id="autoBtn" disabled onclick="autoOptimize()">
+      ✨ 画像を自動分析して最適化
+      <span class="hint">文字を入力してからタップ → 配置・色・補正を自動決定</span>
+    </button>
+
+    <!-- Claude の判断理由 -->
+    <div id="reasonBox" style="display:none; background:#1a1230; border:1px solid #4c3080; border-radius:10px; padding:12px; font-size:12px; line-height:1.7; color:#c4b5fd;">
+      <div style="font-size:10px; font-weight:700; letter-spacing:.06em; color:#8b5cf6; margin-bottom:6px;">🤖 CLAUDE の判断</div>
+      <div id="reasonText"></div>
+    </div>
+
+    <button class="btn-dl" id="dlBtn" disabled onclick="downloadImg()">
+      💾 保存（Instagram品質 1080px）
+    </button>
+  </div>
+
+  <!-- ===== 右：コントロール ===== -->
+  <div class="right">
+
+    <!-- トリミング -->
+    <div class="sec">
+      <div class="sec-title">✂️ トリミング</div>
+      <div class="crop-row">
+        <div class="crop-btn on" data-c="4:5" onclick="setCrop('4:5')">縦 4:5<br><small style="color:var(--muted)">推奨</small></div>
+        <div class="crop-btn" data-c="1:1" onclick="setCrop('1:1')">正方形 1:1</div>
+        <div class="crop-btn" data-c="original" onclick="setCrop('original')">オリジナル</div>
+      </div>
+    </div>
+
+    <!-- 傾き -->
+    <div class="sec">
+      <div class="sec-title">📐 傾き補正</div>
+      <div class="row">
+        <span class="lbl">回転</span>
+        <input type="range" id="rotate" min="-15" max="15" step="0.5" value="0" oninput="sl(this)">
+        <span class="val" id="vrotate">0°</span>
+      </div>
+    </div>
+
+    <!-- 色調整 -->
+    <div class="sec">
+      <div class="sec-title">🔆 明るさ・色調整</div>
+      <div class="row"><span class="lbl">明るさ</span><input type="range" id="brightness" min="0.5" max="2.0" step="0.05" value="1.15" oninput="sl(this)"><span class="val" id="vbrightness">1.15</span></div>
+      <div class="row"><span class="lbl">コントラスト</span><input type="range" id="contrast" min="0.5" max="2.0" step="0.05" value="1.20" oninput="sl(this)"><span class="val" id="vcontrast">1.20</span></div>
+      <div class="row"><span class="lbl">彩度</span><input type="range" id="saturation" min="0.5" max="2.5" step="0.05" value="1.30" oninput="sl(this)"><span class="val" id="vsaturation">1.30</span></div>
+      <div class="row"><span class="lbl">温かみ</span><input type="range" id="warmth" min="-50" max="50" step="1" value="5" oninput="sl(this)"><span class="val" id="vwarmth">+5</span></div>
+    </div>
+
+    <!-- シャープネス -->
+    <div class="sec">
+      <div class="sec-title">🔭 シャープネス（ボケ補正）</div>
+      <div class="row"><span class="lbl">シャープ</span><input type="range" id="sharpness" min="0" max="3.0" step="0.1" value="1.3" oninput="sl(this)"><span class="val" id="vsharpness">1.3</span></div>
+    </div>
+
+    <!-- テキスト -->
+    <div class="sec">
+      <div class="sec-title">✍️ テキスト（1枚目キャッチコピー）</div>
+      <textarea id="textInput" placeholder="例：日本酒って、バツゲームで&#10;飲むものだと思ってた。" oninput="schedPrev()"></textarea>
+
+      <div class="row"><span class="lbl">文字サイズ</span><input type="range" id="text_size" min="20" max="160" step="2" value="68" oninput="sl(this)"><span class="val" id="vtext_size">68</span></div>
+      <div class="row"><span class="lbl">横位置</span><input type="range" id="text_x" min="5" max="95" step="1" value="50" oninput="sl(this)"><span class="val" id="vtext_x">50%</span></div>
+      <div class="row"><span class="lbl">縦位置</span><input type="range" id="text_y" min="5" max="95" step="1" value="15" oninput="sl(this)"><span class="val" id="vtext_y">15%</span></div>
+      <div class="color-row">
+        <span class="lbl">文字の色</span>
+        <input type="color" id="text_color" value="#ffffff" oninput="schedPrev()">
+      </div>
+      <div class="toggle-row">
+        <span style="font-size:13px;color:var(--muted)">影をつける</span>
+        <label class="toggle"><input type="checkbox" id="text_shadow" checked onchange="schedPrev()"><div class="tog-track"></div></label>
+      </div>
+    </div>
+
+  </div><!-- /right -->
+</div>
+
+<div id="toast"></div>
+
+<script>
+  // ── 状態 ──
+  let crop = "4:5";
+  let hasImg = false;
+  let prevTimer = null;
+  let controller = null;   // AbortController（同時リクエスト防止）
+
+  // ── ファイル選択 ──
+  document.getElementById("filePick").addEventListener("change", e => {
+    if (e.target.files[0]) upload(e.target.files[0]);
+  });
+
+  const zone = document.getElementById("zone");
+  zone.addEventListener("click", () => { if (!hasImg) document.getElementById("filePick").click(); });
+  zone.addEventListener("dragover", e => { e.preventDefault(); zone.classList.add("drag"); });
+  zone.addEventListener("dragleave", () => zone.classList.remove("drag"));
+  zone.addEventListener("drop", e => {
+    e.preventDefault(); zone.classList.remove("drag");
+    const f = e.dataTransfer.files[0];
+    if (f && f.type.startsWith("image/")) upload(f);
+  });
+
+  async function upload(file) {
+    spin(true);
+    const fd = new FormData();
+    fd.append("image", file);
+    const res = await fetch("/upload", { method: "POST", body: fd });
+    const d = await res.json();
+    spin(false);
+    if (d.preview) {
+      document.getElementById("prev").src = "data:image/jpeg;base64," + d.preview;
+      zone.classList.add("loaded");
+      hasImg = true;
+      document.getElementById("dlBtn").disabled = false;
+      document.getElementById("autoBtn").disabled = false;
+      // ファイル選択後に自動プレビュー更新
+      schedPrev();
+    }
+  }
+
+  // ── スライダー表示更新 ──
+  function sl(el) {
+    const v = parseFloat(el.value);
+    const vEl = document.getElementById("v" + el.id);
+    if (!vEl) return;
+    if (el.id === "rotate") vEl.textContent = v + "°";
+    else if (el.id === "warmth") vEl.textContent = (v >= 0 ? "+" : "") + v;
+    else if (el.id === "text_x" || el.id === "text_y") vEl.textContent = v + "%";
+    else vEl.textContent = String(v);
+    schedPrev();
+  }
+
+  // ── クロップ ──
+  function setCrop(v) {
+    crop = v;
+    document.querySelectorAll(".crop-btn").forEach(b => b.classList.toggle("on", b.dataset.c === v));
+    schedPrev();
+  }
+
+  // ── プレビュー（デバウンス250ms + AbortController）──
+  function schedPrev() {
+    if (!hasImg) return;
+    clearTimeout(prevTimer);
+    prevTimer = setTimeout(doPreview, 250);
+  }
+
+  async function doPreview() {
+    if (controller) controller.abort();
+    controller = new AbortController();
+    spin(true);
+    try {
+      const res = await fetch("/preview", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(getParams()),
+        signal: controller.signal
+      });
+      const d = await res.json();
+      if (d.preview) document.getElementById("prev").src = "data:image/jpeg;base64," + d.preview;
+    } catch (e) {
+      if (e.name !== "AbortError") console.error(e);
+    }
+    spin(false);
+  }
+
+  // ── 自動最適化 ──
+  async function autoOptimize() {
+    if (!hasImg) return;
+    spin(true);
+    const res = await fetch("/analyze", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text: document.getElementById("textInput").value })
+    });
+    const p = await res.json();
+    spin(false);
+    if (p.error) return;
+
+    // スライダーをアニメーションしながら更新
+    applyParam("rotate",     p.rotate);
+    applyParam("brightness", p.brightness);
+    applyParam("contrast",   p.contrast);
+    applyParam("saturation", p.saturation);
+    applyParam("warmth",     p.warmth);
+    applyParam("sharpness",  p.sharpness);
+    applyParam("text_size",  p.text_size);
+    applyParam("text_x",     p.text_x);
+    applyParam("text_y",     p.text_y);
+
+    if (p.text_color) document.getElementById("text_color").value = p.text_color;
+    if (p.crop) setCrop(p.crop);
+
+    // Claude の判断理由を表示
+    if (p.reason) {
+      document.getElementById("reasonText").textContent = p.reason;
+      document.getElementById("reasonBox").style.display = "block";
+    }
+
+    schedPrev();
+    const msg = p.source === "claude"
+      ? "✨ Claudeが画像を見て最適な設定にしました！"
+      : "✨ 画像を分析して最適な設定にしました";
+    toast(msg);
+  }
+
+  function applyParam(id, val) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.value = val;
+    sl(el);
+  }
+
+  // ── ダウンロード ──
+  async function downloadImg() {
+    if (!hasImg) return;
+    spin(true);
+    const res = await fetch("/download", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(getParams())
+    });
+    spin(false);
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    if (/iPhone|iPad/.test(navigator.userAgent)) {
+      window.open(url, "_blank");
+      toast("📱 画像を長押し →「写真に保存」で保存できます");
+    } else {
+      const a = document.createElement("a");
+      a.href = url; a.download = "insta_post.jpg"; a.click();
+      toast("💾 保存しました！");
+    }
+    setTimeout(() => URL.revokeObjectURL(url), 8000);
+  }
+
+  // ── リセット ──
+  function resetAll() {
+    const def = { rotate:0, brightness:1.15, contrast:1.20, saturation:1.30, warmth:5, sharpness:1.3, text_size:68, text_x:50, text_y:15 };
+    for (const [id, v] of Object.entries(def)) applyParam(id, v);
+    document.getElementById("textInput").value = "";
+    document.getElementById("text_color").value = "#ffffff";
+    document.getElementById("text_shadow").checked = true;
+    setCrop("4:5");
+  }
+
+  // ── パラメータ収集 ──
+  function getParams() {
+    const g = id => document.getElementById(id);
+    return {
+      rotate:      parseFloat(g("rotate").value),
+      crop,
+      brightness:  parseFloat(g("brightness").value),
+      contrast:    parseFloat(g("contrast").value),
+      saturation:  parseFloat(g("saturation").value),
+      warmth:      parseFloat(g("warmth").value),
+      sharpness:   parseFloat(g("sharpness").value),
+      text:        g("textInput").value,
+      text_size:   parseInt(g("text_size").value),
+      text_x:      parseFloat(g("text_x").value),
+      text_y:      parseFloat(g("text_y").value),
+      text_color:  g("text_color").value,
+      text_shadow: g("text_shadow").checked ? "true" : "false",
+    };
+  }
+
+  // ── ユーティリティ ──
+  function spin(on) { document.getElementById("spinner").classList.toggle("on", on); }
+
+  let toastTimer;
+  function toast(msg) {
+    const el = document.getElementById("toast");
+    el.textContent = msg;
+    el.classList.add("show");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => el.classList.remove("show"), 3000);
+  }
+</script>
+</body>
+</html>
