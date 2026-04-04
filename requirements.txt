@@ -2,3 +2,6 @@ flask
 pillow
 anthropic
 gunicorn
+matplotlib
+matplotlib-fontja
+numpy
