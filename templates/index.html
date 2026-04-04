@@ -34,9 +34,12 @@
     .preview{width:100%;aspect-ratio:4/5;border:2px dashed var(--border);border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;overflow:hidden;position:relative;background:var(--card);transition:border-color .2s;}
     .preview:hover{border-color:var(--gold);}
     .preview.loaded{border-style:solid;border-color:var(--border);}
-    .preview img{width:100%;height:100%;object-fit:cover;display:none;}
+    .preview img{width:100%;height:100%;object-fit:cover;display:none;transition:opacity .2s;}
     .preview.loaded img{display:block;}
     .preview.loaded .ph{display:none;}
+    .preview.updating img{opacity:.4;}
+    .preview .loading-ring{display:none;position:absolute;width:36px;height:36px;border:3px solid var(--border);border-top-color:var(--gold);border-radius:50%;animation:spin .7s linear infinite;}
+    .preview.updating .loading-ring{display:block;}
     .ph{display:flex;flex-direction:column;align-items:center;gap:8px;color:var(--muted);pointer-events:none;}
     .ph .ico{font-size:36px;}
     .ph p{font-size:12px;text-align:center;line-height:1.6;}
@@ -55,8 +58,9 @@
     .sec-title{font-size:11px;font-weight:700;letter-spacing:.07em;color:var(--gold);text-transform:uppercase;padding-bottom:6px;border-bottom:1px solid var(--border);}
     .row{display:flex;align-items:center;gap:8px;}
     .lbl{width:76px;flex-shrink:0;font-size:12px;color:var(--muted);}
-    input[type=range]{flex:1;-webkit-appearance:none;height:3px;background:var(--border);border-radius:2px;outline:none;}
-    input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;height:18px;border-radius:50%;background:var(--gold);cursor:pointer;}
+    input[type=range]{flex:1;-webkit-appearance:none;height:4px;background:var(--border);border-radius:2px;outline:none;touch-action:pan-y;}
+    input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:26px;height:26px;border-radius:50%;background:var(--gold);cursor:pointer;}
+    input[type=range]::-moz-range-thumb{width:26px;height:26px;border-radius:50%;background:var(--gold);border:none;cursor:pointer;}
     .val{width:36px;text-align:right;font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums;}
     .crop-row{display:flex;gap:6px;}
     .crop-btn{flex:1;padding:8px 4px;border-radius:8px;border:1px solid var(--border);background:var(--card);color:var(--muted);font-size:12px;cursor:pointer;text-align:center;}
@@ -120,7 +124,7 @@
 <!-- ════ TAB 1: 単品編集 ════ -->
 <div id="tab-editor" class="tab-pane on">
   <div class="left">
-    <div class="preview" id="eZone"><img id="ePrev" alt=""><div class="ph"><div class="ico">📷</div><p>タップして写真を選択</p></div></div>
+    <div class="preview" id="eZone"><img id="ePrev" alt=""><div class="loading-ring"></div><div class="ph"><div class="ico">📷</div><p>タップして写真を選択</p></div></div>
     <input type="file" id="eFile" accept="image/*" style="display:none" onchange="eUpload(this.files[0])">
     <div class="btn-row">
       <button class="btn" onclick="document.getElementById('eFile').click()">📂 写真を開く</button>
@@ -166,7 +170,7 @@
 <!-- ════ TAB 2: 表紙 ════ -->
 <div id="tab-cover" class="tab-pane">
   <div class="left">
-    <div class="preview" id="cZone"><img id="cPrev" alt=""><div class="ph"><div class="ico">🖼️</div><p>集合写真を選択<br><small>全銘柄が写った1枚</small></p></div></div>
+    <div class="preview" id="cZone"><img id="cPrev" alt=""><div class="loading-ring"></div><div class="ph"><div class="ico">🖼️</div><p>集合写真を選択<br><small>全銘柄が写った1枚</small></p></div></div>
     <input type="file" id="cFile" accept="image/*" style="display:none" onchange="cUpload(this.files[0])">
     <div class="btn-row">
       <button class="btn" onclick="document.getElementById('cFile').click()">📂 写真を開く</button>
@@ -206,7 +210,7 @@
 <!-- ════ TAB 3: テイスティングカード ════ -->
 <div id="tab-tasting" class="tab-pane">
   <div class="left">
-    <div class="preview" id="tZone"><img id="tPrev" alt=""><div class="ph"><div class="ico">📸</div><p>銘柄の写真を選択<br><small>瓶の写真など</small></p></div></div>
+    <div class="preview" id="tZone"><img id="tPrev" alt=""><div class="loading-ring"></div><div class="ph"><div class="ico">📸</div><p>銘柄の写真を選択<br><small>瓶の写真など</small></p></div></div>
     <input type="file" id="tFile" accept="image/*" style="display:none" onchange="tUpload(this.files[0])">
     <div class="btn-row">
       <button class="btn" onclick="document.getElementById('tFile').click()">📂 写真を開く</button>
@@ -269,8 +273,13 @@ function toast(m) {
   clearTimeout(toastT); toastT=setTimeout(()=>el.classList.remove("show"),3000);
 }
 function showPrev(imgId, zoneId, b64) {
+  const zone=document.getElementById(zoneId);
   document.getElementById(imgId).src="data:image/jpeg;base64,"+b64;
-  document.getElementById(zoneId).classList.add("loaded");
+  zone.classList.add("loaded");
+  zone.classList.remove("updating");
+}
+function setUpdating(zoneId, on) {
+  document.getElementById(zoneId).classList.toggle("updating", on);
 }
 async function dlBlob(url, params, filename) {
   spin(true);
@@ -311,10 +320,10 @@ function eCrop(v){
 }
 function eSchedPrev(){if(!eHasImg)return;clearTimeout(ePrevTimer);ePrevTimer=setTimeout(eDoPreview,250);}
 async function eDoPreview(){
-  if(eCtrl)eCtrl.abort(); eCtrl=new AbortController(); spin(true);
+  if(eCtrl)eCtrl.abort(); eCtrl=new AbortController();
+  setUpdating("eZone",true);
   try{const d=await(await fetch("/preview",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(eGetParams()),signal:eCtrl.signal})).json();if(d.preview)showPrev("ePrev","eZone",d.preview);}
-  catch(e){if(e.name!=="AbortError")console.error(e);}
-  spin(false);
+  catch(e){if(e.name!=="AbortError")console.error(e); setUpdating("eZone",false);}
 }
 function eGetParams(){
   const g=id=>document.getElementById(id);
@@ -422,12 +431,12 @@ function tSchedPrev(){
   if(!tHasImg)return; clearTimeout(tPrevTimer); tPrevTimer=setTimeout(tDoPreview,300);
 }
 async function tDoPreview(){
-  if(tCtrl)tCtrl.abort(); tCtrl=new AbortController(); spin(true);
+  if(tCtrl)tCtrl.abort(); tCtrl=new AbortController();
+  setUpdating("tZone",true);
   try{
     const d=await(await fetch("/preview_tasting",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(tGetParams()),signal:tCtrl.signal})).json();
     if(d.preview)showPrev("tPrev","tZone",d.preview);
-  }catch(e){if(e.name!=="AbortError")console.error(e);}
-  spin(false);
+  }catch(e){if(e.name!=="AbortError")console.error(e); setUpdating("tZone",false);}
 }
 async function tPreview(){ tDoPreview(); }
 function tDl(){dlBlob("/download_tasting",tGetParams(),"tasting.jpg");}

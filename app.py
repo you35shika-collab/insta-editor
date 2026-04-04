@@ -19,9 +19,12 @@ import anthropic
 app = Flask(__name__)
 
 # ── 画像ストア ──
-_photo_bytes:   bytes | None = None   # 単品編集
-_cover_bytes:   bytes | None = None   # 表紙
-_tasting_bytes: bytes | None = None   # テイスティングカード
+_photo_bytes:   bytes | None = None
+_cover_bytes:   bytes | None = None
+_tasting_bytes: bytes | None = None
+
+# ── レーダーチャートキャッシュ（スコアが同じなら再生成しない）──
+_chart_cache: dict = {"key": None, "img": None}
 
 # ── 日本語フォント（PIL用） ──
 def _find_font() -> str | None:
@@ -55,13 +58,14 @@ def get_font(size: int) -> ImageFont.FreeTypeFont:
 # ════════════════════════════════════════════
 #  共通ユーティリティ
 # ════════════════════════════════════════════
-def _to_base64(img: Image.Image, max_h: int = 900) -> str:
+def _to_base64(img: Image.Image, max_h: int = 600) -> str:
+    """プレビュー用：モバイル転送速度を考慮して小さめに"""
     img = img.copy()
     if img.height > max_h:
         r = max_h / img.height
         img = img.resize((int(img.width * r), max_h), Image.LANCZOS)
     buf = io.BytesIO()
-    img.save(buf, format="JPEG", quality=82)
+    img.save(buf, format="JPEG", quality=75)
     return base64.b64encode(buf.getvalue()).decode()
 
 def _crop45(img: Image.Image) -> Image.Image:
@@ -216,12 +220,18 @@ def generate_cover(bg: Image.Image, names: list[str],
 # ════════════════════════════════════════════
 TASTE_LABELS = ["甘味", "酸味", "旨味", "苦味", "渋み", "香り"]
 
-def make_radar_chart(scores: list[float]) -> Image.Image:
+def make_radar_chart(scores: list[float], for_save: bool = False) -> Image.Image:
+    # キャッシュチェック（スコアが同じなら再生成しない）
+    cache_key = (tuple(scores), for_save)
+    if _chart_cache["key"] == cache_key and _chart_cache["img"] is not None:
+        return _chart_cache["img"].copy()
+
     n = len(TASTE_LABELS)
     angles = np.linspace(0, 2 * np.pi, n, endpoint=False).tolist()
     vals   = scores + [scores[0]]
     angs   = angles + [angles[0]]
 
+    dpi = 150 if for_save else 90  # プレビューは低DPIで高速化
     fig = plt.figure(figsize=(5, 5), facecolor="none")
     ax  = fig.add_subplot(111, polar=True, facecolor="none")
 
@@ -232,30 +242,30 @@ def make_radar_chart(scores: list[float]) -> Image.Image:
     ax.set_xticklabels(TASTE_LABELS, size=18, color="white", fontweight="bold")
     ax.tick_params(pad=10)
 
-    # グリッド
     ax.grid(color="white", alpha=0.2, linewidth=0.8)
     ax.spines["polar"].set_color("white")
     ax.spines["polar"].set_alpha(0.3)
     for gl in ax.yaxis.get_gridlines():
-        gl.set_color("white")
-        gl.set_alpha(0.15)
+        gl.set_color("white"); gl.set_alpha(0.15)
 
-    # 塗りつぶし & ライン
     ax.fill(angs, vals, color="#c9a96e", alpha=0.35)
     ax.plot(angs, vals, color="#c9a96e", linewidth=2.5, zorder=5)
     ax.scatter(angles, scores, color="#c9a96e", s=55, zorder=6, edgecolors="white", linewidths=0.8)
 
-    # スコアラベル
     for ang, sc in zip(angles, scores):
         ax.text(ang, sc + 0.45, str(int(sc)), ha="center", va="center",
                 color="white", fontsize=10, fontweight="bold")
 
     plt.tight_layout(pad=0.3)
     buf = io.BytesIO()
-    fig.savefig(buf, format="png", transparent=True, dpi=160, bbox_inches="tight")
+    fig.savefig(buf, format="png", transparent=True, dpi=dpi, bbox_inches="tight")
     plt.close(fig)
     buf.seek(0)
-    return Image.open(buf).convert("RGBA")
+    result = Image.open(buf).convert("RGBA")
+
+    _chart_cache["key"] = cache_key
+    _chart_cache["img"] = result.copy()
+    return result
 
 def generate_tasting_card(bg: Image.Image, sake_name: str, scores: list[float],
                            chart_x: int = 50, chart_y: int = 55, chart_size: int = 75,
@@ -288,7 +298,7 @@ def generate_tasting_card(bg: Image.Image, sake_name: str, scores: list[float],
     _draw_gold_line(draw, nx, line_y, 400)
 
     # ── レーダーチャート ──
-    radar   = make_radar_chart(scores)
+    radar   = make_radar_chart(scores, for_save=False)
     chart_w = int(w * chart_size / 100)
     radar   = radar.resize((chart_w, chart_w), Image.LANCZOS)
     # chart_x/chart_y はチャート中心の位置（%）
@@ -519,10 +529,13 @@ def download_tasting():
     if not _tasting_bytes: return jsonify({"error":"no image"}), 400
     p   = _tasting_params(request.get_json() or {})
     img = Image.open(io.BytesIO(_tasting_bytes)).convert("RGB")
+    # 保存時は高品質チャートを使う
+    _chart_cache["key"] = None
     result = generate_tasting_card(img, p["sake_name"], p["scores"],
                                     p["chart_x"], p["chart_y"], p["chart_size"],
                                     p["name_x"], p["name_y"], p["name_size"],
                                     p["name_color"], p["name_shadow"])
+    _chart_cache["key"] = None  # キャッシュをリセットして次回プレビューに戻す
     buf = io.BytesIO(); result.save(buf, "JPEG", quality=95); buf.seek(0)
     return send_file(buf, mimetype="image/jpeg", as_attachment=True, download_name="tasting.jpg")
 
