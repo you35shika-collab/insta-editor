@@ -235,8 +235,8 @@ def make_radar_chart(scores: list[float], for_save: bool = False) -> Image.Image
     fig = plt.figure(figsize=(5, 5), facecolor="none")
     ax  = fig.add_subplot(111, polar=True, facecolor="none")
 
-    ax.set_ylim(0, 5)
-    ax.set_yticks([1, 2, 3, 4, 5])
+    ax.set_ylim(0, 10)
+    ax.set_yticks([2, 4, 6, 8, 10])
     ax.set_yticklabels([])
     ax.set_xticks(angles)
     ax.set_xticklabels(TASTE_LABELS, size=18, color="white", fontweight="bold")
@@ -253,7 +253,7 @@ def make_radar_chart(scores: list[float], for_save: bool = False) -> Image.Image
     ax.scatter(angles, scores, color="#c9a96e", s=55, zorder=6, edgecolors="white", linewidths=0.8)
 
     for ang, sc in zip(angles, scores):
-        ax.text(ang, sc + 0.45, str(int(sc)), ha="center", va="center",
+        ax.text(ang, sc + 0.7, str(int(sc)), ha="center", va="center",
                 color="white", fontsize=10, fontweight="bold")
 
     plt.tight_layout(pad=0.3)
@@ -500,7 +500,7 @@ def upload_tasting():
 
 def _tasting_params(data: dict):
     name   = data.get("sake_name", "銘柄名")
-    scores = [float(data.get(k, 3)) for k in ["甘味","酸味","旨味","苦味","渋み","香り"]]
+    scores = [float(data.get(k, 5)) for k in ["甘味","酸味","旨味","苦味","渋み","香り"]]
     return dict(
         sake_name=name, scores=scores,
         chart_x=int(data.get("chart_x", 50)),
@@ -550,7 +550,7 @@ def generate_caption():
 
     if mode == "cover":
         names = data.get("names", [])
-        prompt = f"""あなたはInstagramで日本酒を発信している26歳です。
+        prompt = f"""あなたはInstagramで日本酒を発信している26歳の男性です。
 アカウント名：よう🍶（@nihonshu_you）
 コンセプト：難しくない、堅苦しくない日本酒を同世代に広める
 
@@ -559,12 +559,17 @@ def generate_caption():
 
 この投稿のInstagramキャプションを書いてください。
 
-条件：
+文体の条件：
+- 男性的または中性的な口調（「〜だった」「〜だな」「〜してみた」など）
+- 柔らかすぎず、でも堅くもない自然な話し言葉
+- 「〜ですね！」「〜でした♪」のような女性的・過度に丁寧な表現は避ける
+
+内容の条件：
 - 共感を呼ぶ書き出し（体験談・驚き・問いかけなど）
 - 飲み比べの感想を1〜2文（具体的かつ親しみやすく）
 - 締めの一言
 - 改行を使って読みやすく
-- 文末に絵文字を適度に使う
+- 絵文字は各段落に1個程度、自然に使う（合計4〜6個）
 - ハッシュタグは最後にまとめて10個程度
 - 全体で200〜280文字程度
 
@@ -574,7 +579,7 @@ def generate_caption():
         name   = data.get("sake_name", "")
         scores = {k: data.get(k, 3) for k in ["甘味","酸味","旨味","苦味","渋み","香り"]}
         score_text = "、".join([f"{k}{v}" for k, v in scores.items()])
-        prompt = f"""あなたはInstagramで日本酒を発信している26歳です。
+        prompt = f"""あなたはInstagramで日本酒を発信している26歳の男性です。
 アカウント名：よう🍶（@nihonshu_you）
 コンセプト：難しくない、堅苦しくない日本酒を同世代に広める
 
@@ -583,13 +588,18 @@ def generate_caption():
 
 この銘柄のInstagramキャプションを書いてください。
 
-条件：
+文体の条件：
+- 男性的または中性的な口調（「〜だった」「〜だな」「〜してみた」など）
+- 柔らかすぎず、でも堅くもない自然な話し言葉
+- 「〜ですね！」「〜でした♪」のような女性的・過度に丁寧な表現は避ける
+
+内容の条件：
 - 共感を呼ぶ書き出し（体験談・驚き・問いかけなど）
 - スコアをもとにした飲んだ感想を2〜3文（専門用語NG、共感できる言葉で）
 - どんな場面・料理に合うか一言
 - 締めの一言
 - 改行を使って読みやすく
-- 文末に絵文字を適度に使う
+- 絵文字は各段落に1個程度、自然に使う（合計4〜6個）
 - ハッシュタグは最後にまとめて10個程度
 - 全体で250〜320文字程度
 
