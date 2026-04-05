@@ -232,33 +232,35 @@ def make_radar_chart(scores: list[float], for_save: bool = False) -> Image.Image
     angs   = angles + [angles[0]]
 
     dpi = 150 if for_save else 90  # プレビューは低DPIで高速化
-    fig = plt.figure(figsize=(5, 5), facecolor="none")
-    ax  = fig.add_subplot(111, polar=True, facecolor="none")
+    bg_color = (0.031, 0.020, 0.071)  # 濃紺 — チャート専用背景色
+    fig = plt.figure(figsize=(5, 5), facecolor=bg_color)
+    ax  = fig.add_subplot(111, polar=True, facecolor=bg_color)
 
     ax.set_ylim(0, 10)
     ax.set_yticks([2, 4, 6, 8, 10])
-    ax.set_yticklabels([])
+    ax.set_yticklabels(["2","4","6","8","10"], fontsize=7, color="white", alpha=0.45)
     ax.set_xticks(angles)
-    ax.set_xticklabels(TASTE_LABELS, size=18, color="white", fontweight="bold")
-    ax.tick_params(pad=10)
+    ax.set_xticklabels(TASTE_LABELS, size=20, color="white", fontweight="bold")
+    ax.tick_params(pad=12)
 
-    ax.grid(color="white", alpha=0.2, linewidth=0.8)
-    ax.spines["polar"].set_color("white")
-    ax.spines["polar"].set_alpha(0.3)
+    # グリッドを金色に — ジョジョのスタンドカード風
+    ax.grid(color="#c9a96e", alpha=0.30, linewidth=1.0)
+    ax.spines["polar"].set_color("#c9a96e")
+    ax.spines["polar"].set_alpha(0.85)
     for gl in ax.yaxis.get_gridlines():
-        gl.set_color("white"); gl.set_alpha(0.15)
+        gl.set_color("#c9a96e"); gl.set_alpha(0.25)
 
-    ax.fill(angs, vals, color="#c9a96e", alpha=0.35)
-    ax.plot(angs, vals, color="#c9a96e", linewidth=2.5, zorder=5)
-    ax.scatter(angles, scores, color="#c9a96e", s=55, zorder=6, edgecolors="white", linewidths=0.8)
+    ax.fill(angs, vals, color="#c9a96e", alpha=0.50)
+    ax.plot(angs, vals, color="#c9a96e", linewidth=3.0, zorder=5)
+    ax.scatter(angles, scores, color="#ffd966", s=65, zorder=6, edgecolors="white", linewidths=1.0)
 
     for ang, sc in zip(angles, scores):
-        ax.text(ang, sc + 0.7, str(int(sc)), ha="center", va="center",
-                color="white", fontsize=10, fontweight="bold")
+        ax.text(ang, sc + 0.9, str(int(sc)), ha="center", va="center",
+                color="white", fontsize=12, fontweight="bold")
 
-    plt.tight_layout(pad=0.3)
+    plt.tight_layout(pad=1.2)
     buf = io.BytesIO()
-    fig.savefig(buf, format="png", transparent=True, dpi=dpi, bbox_inches="tight")
+    fig.savefig(buf, format="png", transparent=False, dpi=dpi, bbox_inches="tight", pad_inches=0.15)
     plt.close(fig)
     buf.seek(0)
     result = Image.open(buf).convert("RGBA")
@@ -270,7 +272,8 @@ def make_radar_chart(scores: list[float], for_save: bool = False) -> Image.Image
 def generate_tasting_card(bg: Image.Image, sake_name: str, scores: list[float],
                            chart_x: int = 50, chart_y: int = 55, chart_size: int = 75,
                            name_x: int = 50, name_y: int = 10, name_size: int = 82,
-                           name_color: str = "#ffffff", name_shadow: bool = True) -> Image.Image:
+                           name_color: str = "#ffffff", name_shadow: bool = True,
+                           for_save: bool = False) -> Image.Image:
     img = _crop45(bg)
     w, h = img.size
 
@@ -285,32 +288,47 @@ def generate_tasting_card(bg: Image.Image, sake_name: str, scores: list[float],
     img = Image.alpha_composite(img.convert("RGBA"), ov).convert("RGB")
     draw = ImageDraw.Draw(img)
 
-    # ── 銘柄名 ──
+    img_rgba = img.convert("RGBA")
+
+    # ── 銘柄名（背景バー付き）──
     nx = int(w * name_x / 100)
     ny = int(h * name_y / 100)
     font_title = get_font(name_size)
-    if name_shadow:
-        for ox, oy in [(3, 3), (-3, 3), (3, -3), (-3, -3)]:
-            draw.text((nx + ox, ny + oy), sake_name, font=font_title, fill=(0, 0, 0), anchor="mm")
+    # 背景バー：テキストが何色の写真の上でも読める
+    bar_h = name_size + 28
+    bar = Image.new("RGBA", (w, bar_h), (0, 0, 0, 170))
+    img_rgba.paste(bar, (0, ny - bar_h // 2), bar)
+    draw = ImageDraw.Draw(img_rgba)
+    # デコライン（上下2本でジョジョ的格式感）
+    line_y_top = ny - bar_h // 2 + 2
+    line_y_bot = ny + bar_h // 2 - 2
+    draw.line([(0, line_y_top), (w, line_y_top)], fill="#c9a96e", width=2)
+    draw.line([(0, line_y_bot), (w, line_y_bot)], fill="#c9a96e", width=2)
+    # テキスト
     draw.text((nx, ny), sake_name, font=font_title, fill=name_color, anchor="mm")
-    # デコラインは銘柄名の少し下
-    line_y = ny + name_size // 2 + 10
-    _draw_gold_line(draw, nx, line_y, 400)
 
     # ── レーダーチャート ──
-    radar   = make_radar_chart(scores, for_save=False)
-    chart_w = int(w * chart_size / 100)
-    radar   = radar.resize((chart_w, chart_w), Image.LANCZOS)
+    radar    = make_radar_chart(scores, for_save=for_save)
+    chart_w  = int(w * chart_size / 100)
+    # アスペクト比を維持してリサイズ（ラベルが切れないよう）
+    rw, rh   = radar.size
+    scale    = chart_w / max(rw, rh)
+    radar    = radar.resize((int(rw * scale), int(rh * scale)), Image.LANCZOS)
+    rw2, rh2 = radar.size
     # chart_x/chart_y はチャート中心の位置（%）
-    cx_r = int(w * chart_x / 100) - chart_w // 2
-    cy_r = int(h * chart_y / 100) - chart_w // 2
+    cx_r = int(w * chart_x / 100) - rw2 // 2
+    cy_r = int(h * chart_y / 100) - rh2 // 2
 
-    # チャート背景パネル
-    pad  = 12
-    panel = Image.new("RGBA", (chart_w + pad*2, chart_w + pad*2), (8, 5, 18, 175))
-    img_rgba = img.convert("RGBA")
-    img_rgba.paste(panel, (cx_r - pad, cy_r - pad), panel)
-    img_rgba.paste(radar,  (cx_r, cy_r), radar)
+    # 金色の枠線付きパネルをチャートに合成
+    pad   = 6
+    pw, ph = rw2 + pad * 2, rh2 + pad * 2
+    border_layer = Image.new("RGBA", (pw, ph), (0, 0, 0, 0))
+    bd = ImageDraw.Draw(border_layer)
+    bd.rectangle([(0, 0), (pw - 1, ph - 1)], outline="#c9a96e", width=3)
+    bg_panel = Image.new("RGBA", (pw, ph), (8, 5, 18, 255))
+    bg_panel.paste(radar.convert("RGBA"), (pad, pad))
+    bg_panel = Image.alpha_composite(bg_panel, border_layer)
+    img_rgba.paste(bg_panel, (cx_r - pad, cy_r - pad), bg_panel)
     img = img_rgba.convert("RGB")
 
     return img
@@ -534,7 +552,8 @@ def download_tasting():
     result = generate_tasting_card(img, p["sake_name"], p["scores"],
                                     p["chart_x"], p["chart_y"], p["chart_size"],
                                     p["name_x"], p["name_y"], p["name_size"],
-                                    p["name_color"], p["name_shadow"])
+                                    p["name_color"], p["name_shadow"],
+                                    for_save=True)
     _chart_cache["key"] = None  # キャッシュをリセットして次回プレビューに戻す
     buf = io.BytesIO(); result.save(buf, "JPEG", quality=95); buf.seek(0)
     return send_file(buf, mimetype="image/jpeg", as_attachment=True, download_name="tasting.jpg")

@@ -233,9 +233,9 @@
       </div>
     </div>
     <div class="sec"><div class="sec-title">📍 チャートの位置・サイズ</div>
-      <div class="row"><span class="lbl">横位置</span><input type="range" id="t_chart_x" min="10" max="90" step="1" value="50" oninput="tslPos(this,'t_chart_x','チャート横')" onchange="tOnRelease()"><span class="val" id="vt_chart_x">50%</span></div>
-      <div class="row"><span class="lbl">縦位置</span><input type="range" id="t_chart_y" min="20" max="95" step="1" value="55" oninput="tslPos(this,'t_chart_y','チャート縦')" onchange="tOnRelease()"><span class="val" id="vt_chart_y">55%</span></div>
-      <div class="row"><span class="lbl">サイズ</span><input type="range" id="t_chart_size" min="30" max="95" step="1" value="75" oninput="tslPos(this,'t_chart_size','チャートサイズ')" onchange="tOnRelease()"><span class="val" id="vt_chart_size">75%</span></div>
+      <div class="row"><span class="lbl">横位置</span><input type="range" id="t_chart_x" min="10" max="90" step="1" value="72" oninput="tslPos(this,'t_chart_x','チャート横')" onchange="tOnRelease()"><span class="val" id="vt_chart_x">72%</span></div>
+      <div class="row"><span class="lbl">縦位置</span><input type="range" id="t_chart_y" min="20" max="95" step="1" value="70" oninput="tslPos(this,'t_chart_y','チャート縦')" onchange="tOnRelease()"><span class="val" id="vt_chart_y">70%</span></div>
+      <div class="row"><span class="lbl">サイズ</span><input type="range" id="t_chart_size" min="30" max="95" step="1" value="60" oninput="tslPos(this,'t_chart_size','チャートサイズ')" onchange="tOnRelease()"><span class="val" id="vt_chart_size">60%</span></div>
     </div>
     <div class="sec"><div class="sec-title">✍️ キャプション自動生成</div>
       <button class="btn-auto" id="tCapBtn" disabled onclick="genCaption('tasting')" style="margin-bottom:8px">
@@ -251,7 +251,7 @@
       <div class="row"><span class="lbl">縦位置</span><input type="range" id="t_name_y" min="2" max="90" step="1" value="10" oninput="tslPos(this,'t_name_y','名前縦')" onchange="tOnRelease()"><span class="val" id="vt_name_y">10%</span></div>
       <div class="row"><span class="lbl">文字サイズ</span><input type="range" id="t_name_size" min="20" max="160" step="2" value="82" oninput="tslPos(this,'t_name_size','名前サイズ')" onchange="tOnRelease()"><span class="val" id="vt_name_size">82</span></div>
       <div class="row"><span class="lbl">文字の色</span><input type="color" id="t_name_color" value="#ffffff" onchange="tOnRelease()"></div>
-      <div class="row" style="justify-content:space-between"><span style="font-size:13px;color:var(--muted)">影をつける</span><label class="toggle"><input type="checkbox" id="t_name_shadow" checked onchange="tSchedPrev()"><div class="tog"></div></label></div>
+      <div class="row" style="justify-content:space-between"><span style="font-size:13px;color:var(--muted)">影をつける</span><label class="toggle"><input type="checkbox" id="t_name_shadow" checked onchange="tOnRelease()"><div class="tog"></div></label></div>
     </div>
   </div>
 </div>
