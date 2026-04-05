@@ -117,8 +117,9 @@
 <!-- ── タブ ── -->
 <div class="tabs">
   <button class="tab on"  onclick="switchTab('editor')">単品編集</button>
-  <button class="tab"     onclick="switchTab('cover')">表紙テンプレート</button>
-  <button class="tab"     onclick="switchTab('tasting')">テイスティングカード</button>
+  <button class="tab"     onclick="switchTab('cover')">表紙</button>
+  <button class="tab"     onclick="switchTab('tasting')">テイスティング</button>
+  <button class="tab"     onclick="switchTab('stand')">スタンドカード</button>
 </div>
 
 <!-- ════ TAB 1: 単品編集 ════ -->
@@ -222,6 +223,12 @@
     <div class="sec"><div class="sec-title">🍶 銘柄情報</div>
       <input type="text" id="t_name" placeholder="銘柄名（例：而今 純米吟醸）" onchange="tOnRelease()" onkeydown="if(event.key==='Enter')tOnRelease()">
     </div>
+    <div class="sec"><div class="sec-title">🔤 フォント</div>
+      <select id="t_font" onchange="tOnRelease()" style="width:100%;padding:8px;background:var(--card);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;">
+        <option value="mincho">明朝体（和風・推奨）</option>
+        <option value="gothic">ゴシック体（モダン）</option>
+      </select>
+    </div>
     <div class="sec"><div class="sec-title">📊 テイスティングスコア（各 1〜5）</div>
       <div class="taste-grid">
         <div class="taste-item"><div class="taste-lbl">甘味 <span id="v甘味">5</span></div><input type="range" data-key="甘味" min="1" max="10" step="1" value="5" oninput="tsl(this)" onchange="tOnRelease()"></div>
@@ -256,12 +263,63 @@
   </div>
 </div>
 
+<!-- ════ TAB 4: スタンドカード ════ -->
+<div id="tab-stand" class="tab-pane">
+  <div class="left">
+    <div class="preview" id="sZone" style="aspect-ratio:4/3"><img id="sPrev" alt=""><div class="loading-ring"></div><div class="ph"><div class="ico">🃏</div><p>スタンドカードを設定<br><small>右側で銘柄名・スコアを入力</small></p></div></div>
+    <!-- ステッカーアップロード -->
+    <div style="margin-top:8px;border:2px dashed var(--border);border-radius:10px;padding:10px;cursor:pointer;text-align:center;font-size:12px;color:var(--muted)" id="stickerZone" onclick="document.getElementById('stickerFile').click()">
+      <div id="stickerPrevWrap" style="display:none"><img id="stickerPrevImg" style="max-height:80px;border-radius:6px" alt=""></div>
+      <div id="stickerPh">📱 ステッカーを追加<br><small>iPhoneで切り抜いた透過PNG</small></div>
+    </div>
+    <input type="file" id="stickerFile" accept="image/*" style="display:none" onchange="sUploadSticker(this.files[0])">
+    <div class="btn-row" style="margin-top:8px">
+      <button class="btn" onclick="sDoPreview()">👁 プレビュー</button>
+      <button class="btn" onclick="sClearSticker()">✕ ステッカー削除</button>
+    </div>
+    <button class="btn-dl" id="sDlBtn" onclick="sDl()">💾 スタンドカードを保存</button>
+  </div>
+  <div class="right">
+    <div class="sec"><div class="sec-title">🍶 銘柄名</div>
+      <input type="text" id="s_name" placeholder="銘柄名（例：風の森 純米吟醸）" onchange="sOnRelease()" onkeydown="if(event.key==='Enter')sOnRelease()">
+    </div>
+    <div class="sec"><div class="sec-title">📊 テイスティングスコア（1〜10）</div>
+      <div class="taste-grid">
+        <div class="taste-item"><div class="taste-lbl">甘味 <span id="sv甘味">5</span></div><input type="range" data-key="甘味" min="1" max="10" step="1" value="5" oninput="ssl(this)" onchange="sOnRelease()"></div>
+        <div class="taste-item"><div class="taste-lbl">酸味 <span id="sv酸味">5</span></div><input type="range" data-key="酸味" min="1" max="10" step="1" value="5" oninput="ssl(this)" onchange="sOnRelease()"></div>
+        <div class="taste-item"><div class="taste-lbl">旨味 <span id="sv旨味">5</span></div><input type="range" data-key="旨味" min="1" max="10" step="1" value="5" oninput="ssl(this)" onchange="sOnRelease()"></div>
+        <div class="taste-item"><div class="taste-lbl">苦味 <span id="sv苦味">5</span></div><input type="range" data-key="苦味" min="1" max="10" step="1" value="5" oninput="ssl(this)" onchange="sOnRelease()"></div>
+        <div class="taste-item"><div class="taste-lbl">渋み <span id="sv渋み">5</span></div><input type="range" data-key="渋み" min="1" max="10" step="1" value="5" oninput="ssl(this)" onchange="sOnRelease()"></div>
+        <div class="taste-item"><div class="taste-lbl">香り <span id="sv香り">5</span></div><input type="range" data-key="香り" min="1" max="10" step="1" value="5" oninput="ssl(this)" onchange="sOnRelease()"></div>
+      </div>
+    </div>
+    <div class="sec"><div class="sec-title">🔤 フォント / 背景色</div>
+      <div class="row"><span class="lbl">フォント</span>
+        <select id="s_font" onchange="sOnRelease()" style="flex:1;padding:8px;background:var(--card);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;">
+          <option value="mincho">明朝体（推奨）</option>
+          <option value="gothic">ゴシック体</option>
+        </select>
+      </div>
+      <div class="row"><span class="lbl">背景色</span><input type="color" id="s_bg" value="#0a0710" onchange="sOnRelease()"></div>
+    </div>
+    <div class="sec"><div class="sec-title">✍️ キャプション自動生成</div>
+      <button class="btn-auto" id="sCapBtn" onclick="genCaption('stand')" style="margin-bottom:8px">
+        ✨ Claudeでキャプションを生成<br><small style="font-weight:400;opacity:.8">銘柄名とスコアを入力してからタップ</small>
+      </button>
+      <div id="sCapBox" style="display:none">
+        <textarea id="sCapText" style="min-height:180px;font-size:13px;line-height:1.7" readonly></textarea>
+        <button class="btn" onclick="copyCaption('sCapText')" style="width:100%;margin-top:6px">📋 コピー</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div id="toast"></div>
 
 <script>
 // ════ タブ切替 ════
 function switchTab(id) {
-  document.querySelectorAll(".tab").forEach((t,i) => t.classList.toggle("on", ["editor","cover","tasting"][i]===id));
+  document.querySelectorAll(".tab").forEach((t,i) => t.classList.toggle("on", ["editor","cover","tasting","stand"][i]===id));
   document.querySelectorAll(".tab-pane").forEach(p => p.classList.toggle("on", p.id==="tab-"+id));
 }
 
@@ -423,6 +481,7 @@ function tGetParams(){
     name_size:  parseInt(g("t_name_size").value),
     name_color: g("t_name_color").value,
     name_shadow: g("t_name_shadow").checked ? "true" : "false",
+    font_style: g("t_font").value,
   };
 }
 function tOnRelease(){
@@ -440,17 +499,61 @@ async function tDoPreview(){
 async function tPreview(){ tDoPreview(); }
 function tDl(){dlBlob("/download_tasting",tGetParams(),"tasting.jpg");}
 
+// ════ TAB4: スタンドカード ════
+let sRequesting=false;
+
+function ssl(el){
+  const k=el.dataset.key; document.getElementById("sv"+k).textContent=el.value;
+}
+function sGetParams(){
+  const scores={};
+  document.querySelectorAll("#tab-stand input[data-key]").forEach(el=>scores[el.dataset.key]=parseFloat(el.value));
+  const g=id=>document.getElementById(id);
+  return{sake_name:g("s_name").value||"銘柄名",...scores,font_style:g("s_font").value,bg_color:g("s_bg").value};
+}
+async function sUploadSticker(file){
+  if(!file)return; spin(true);
+  const fd=new FormData(); fd.append("image",file);
+  const d=await(await fetch("/upload_sticker",{method:"POST",body:fd})).json();
+  spin(false);
+  if(d.preview){
+    document.getElementById("stickerPrevImg").src="data:image/jpeg;base64,"+d.preview;
+    document.getElementById("stickerPrevWrap").style.display="block";
+    document.getElementById("stickerPh").style.display="none";
+    toast("✅ ステッカーを追加しました");
+    sDoPreview();
+  }
+}
+function sClearSticker(){
+  document.getElementById("stickerPrevWrap").style.display="none";
+  document.getElementById("stickerPh").style.display="block";
+  fetch("/upload_sticker",{method:"POST",body:new FormData()}); // サーバーのステッカーをクリア（空で送信）
+}
+function sOnRelease(){ sDoPreview(); }
+async function sDoPreview(){
+  if(sRequesting)return;
+  sRequesting=true; setUpdating("sZone",true);
+  try{
+    const d=await(await fetch("/preview_stand",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(sGetParams())})).json();
+    if(d.preview)showPrev("sPrev","sZone",d.preview);
+  }catch(e){console.error(e); setUpdating("sZone",false);}
+  sRequesting=false;
+}
+function sDl(){dlBlob("/download_stand",sGetParams(),"stand_card.jpg");}
+
 // ════ キャプション生成（共通）════
 async function genCaption(mode){
   spin(true);
   const body = mode==="cover"
     ? {mode:"cover", names:cGetNames()}
+    : mode==="stand"
+    ? {mode:"tasting", ...sGetParams()}
     : {mode:"tasting", ...tGetParams()};
   const d=await(await fetch("/generate_caption",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)})).json();
   spin(false);
   if(d.error){toast("⚠️ "+d.error);return;}
-  const boxId = mode==="cover" ? "cCapBox" : "tCapBox";
-  const txtId = mode==="cover" ? "cCapText" : "tCapText";
+  const boxId = mode==="cover" ? "cCapBox" : mode==="stand" ? "sCapBox" : "tCapBox";
+  const txtId = mode==="cover" ? "cCapText" : mode==="stand" ? "sCapText" : "tCapText";
   document.getElementById(boxId).style.display="block";
   document.getElementById(txtId).value=d.caption;
   toast("✨ キャプションを生成しました！");

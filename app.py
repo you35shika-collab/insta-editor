@@ -22,6 +22,7 @@ app = Flask(__name__)
 _photo_bytes:   bytes | None = None
 _cover_bytes:   bytes | None = None
 _tasting_bytes: bytes | None = None
+_sticker_bytes: bytes | None = None   # iPhone切り抜きステッカー（透過PNG）
 
 # ── レーダーチャートキャッシュ（スコアが同じなら再生成しない）──
 _chart_cache: dict = {"key": None, "img": None}
@@ -46,12 +47,48 @@ def _find_font() -> str | None:
 
 _JP_FONT = _find_font()
 
-def get_font(size: int) -> ImageFont.FreeTypeFont:
-    if _JP_FONT:
+# ── フォント管理（ゴシック / 明朝）──
+_FONT_PATHS: dict[str, str | None] = {"gothic": _JP_FONT, "mincho": None}
+
+def _download_mincho() -> None:
+    """IPAex明朝をバックグラウンドでダウンロードしてキャッシュ"""
+    cache_dir = "/tmp/ieditor_fonts"
+    os.makedirs(cache_dir, exist_ok=True)
+    path = os.path.join(cache_dir, "ipaexm.ttf")
+    if os.path.exists(path) and os.path.getsize(path) > 500_000:
+        _FONT_PATHS["mincho"] = path
+        return
+    urls = [
+        "https://raw.githubusercontent.com/ootaharuki99/IPAexfont/master/ipaexm.ttf",
+    ]
+    for url in urls:
         try:
-            return ImageFont.truetype(_JP_FONT, size)
+            req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+            with urllib.request.urlopen(req, timeout=20) as resp:
+                data = resp.read()
+            if len(data) > 500_000:
+                with open(path, "wb") as f:
+                    f.write(data)
+                _FONT_PATHS["mincho"] = path
+                return
         except Exception:
-            pass
+            continue
+
+import threading as _threading
+_threading.Thread(target=_download_mincho, daemon=True).start()
+
+
+def get_font(size: int, style: str = "gothic") -> ImageFont.FreeTypeFont:
+    path = _FONT_PATHS.get(style) or _JP_FONT
+    if path:
+        try:
+            return ImageFont.truetype(path, size)
+        except Exception:
+            if _JP_FONT and path != _JP_FONT:
+                try:
+                    return ImageFont.truetype(_JP_FONT, size)
+                except Exception:
+                    pass
     return ImageFont.load_default()
 
 
@@ -273,7 +310,7 @@ def generate_tasting_card(bg: Image.Image, sake_name: str, scores: list[float],
                            chart_x: int = 50, chart_y: int = 55, chart_size: int = 75,
                            name_x: int = 50, name_y: int = 10, name_size: int = 82,
                            name_color: str = "#ffffff", name_shadow: bool = True,
-                           for_save: bool = False) -> Image.Image:
+                           for_save: bool = False, font_style: str = "mincho") -> Image.Image:
     img = _crop45(bg)
     w, h = img.size
 
@@ -293,7 +330,7 @@ def generate_tasting_card(bg: Image.Image, sake_name: str, scores: list[float],
     # ── 銘柄名（背景バー付き）──
     nx = int(w * name_x / 100)
     ny = int(h * name_y / 100)
-    font_title = get_font(name_size)
+    font_title = get_font(name_size, font_style)
     # 背景バー：テキストが何色の写真の上でも読める
     bar_h = name_size + 28
     bar = Image.new("RGBA", (w, bar_h), (0, 0, 0, 170))
@@ -332,6 +369,123 @@ def generate_tasting_card(bg: Image.Image, sake_name: str, scores: list[float],
     img = img_rgba.convert("RGB")
 
     return img
+
+
+# ════════════════════════════════════════════
+#  ジョジョ風スタンドカード（横長）
+# ════════════════════════════════════════════
+_GRADE = {10:"A",9:"A",8:"B",7:"B",6:"C",5:"C",4:"D",3:"D",2:"E",1:"E"}
+
+def _score_grade(s: float) -> str:
+    return _GRADE.get(max(1, min(10, int(round(s)))), "C")
+
+def generate_stand_card(
+    sticker: "Image.Image | None",
+    sake_name: str,
+    scores: list[float],
+    font_style: str = "mincho",
+    bg_color: str = "#0a0710",
+    for_save: bool = False,
+) -> Image.Image:
+    """ジョジョ風スタンドカード — 横長 1080×810"""
+    W, H = 1080, 810
+    GOLD = "#c9a96e"
+
+    # ── 背景（左上が少し明るい微グラデ）──
+    r, g, b = int(bg_color[1:3], 16), int(bg_color[3:5], 16), int(bg_color[5:7], 16)
+    card = Image.new("RGBA", (W, H), (r, g, b, 255))
+    ov = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    ovd = ImageDraw.Draw(ov)
+    for px in range(W):
+        a = int(35 * (1 - px / W))
+        ovd.line([(px, 0), (px, H)], fill=(255, 255, 255, a))
+    card = Image.alpha_composite(card, ov)
+    draw = ImageDraw.Draw(card)
+
+    # ── 二重枠線 ──
+    draw.rectangle([(12, 12), (W - 13, H - 13)], outline=GOLD, width=3)
+    draw.rectangle([(20, 20), (W - 21, H - 21)], outline=GOLD, width=1)
+
+    # ── タイトル帯（y=27〜120）──
+    draw.rectangle([(25, 27), (W - 26, 118)], fill=(0, 0, 0, 210))
+    draw.line([(25, 27),  (W - 26, 27)],  fill=GOLD, width=2)
+    draw.line([(25, 118), (W - 26, 118)], fill=GOLD, width=2)
+
+    sub_font  = get_font(22, "gothic")
+    name_font = get_font(68 if for_save else 56, font_style)
+    draw.text((42, 48), "NIHONSHU STAND", font=sub_font, fill=GOLD)
+    draw.text((W // 2, 73), sake_name, font=name_font, fill="#ffffff", anchor="mm")
+
+    # ── コンテンツエリア（y=130〜H-25）──
+    C_TOP = 130
+    C_H   = H - C_TOP - 25
+    L_W   = 450    # 左ゾーン幅（ステッカー）
+    DIV_X = L_W + 30
+    R_X   = DIV_X + 12   # 右ゾーン開始X
+    R_W   = W - R_X - 25  # 右ゾーン幅
+
+    # 中央分割線
+    draw.line([(DIV_X + 5, C_TOP + 8), (DIV_X + 5, H - 28)], fill=GOLD, width=1)
+
+    # ── 左側：ステッカー ──
+    if sticker:
+        st = sticker.convert("RGBA")
+        sw, sh = st.size
+        max_w, max_h = L_W - 20, C_H - 10
+        scale = min(max_w / sw, max_h / sh, 1.0)
+        nw, nh = int(sw * scale), int(sh * scale)
+        st = st.resize((nw, nh), Image.LANCZOS)
+        sx = 25 + (max_w - nw) // 2 + 10
+        sy = C_TOP + (C_H - nh) // 2
+        card.paste(st, (sx, sy), st)
+    else:
+        # ステッカーなし：装飾的な「？」プレースホルダ
+        ph_font = get_font(120, "gothic")
+        draw.text((25 + L_W // 2, C_TOP + C_H // 2), "🍶", font=ph_font,
+                  fill=(100, 80, 30), anchor="mm")
+
+    # ── 右側上部：チャート ──
+    chart_area_h = int(C_H * 0.60)
+    chart_img = make_radar_chart(scores, for_save=for_save)
+    cw, ch = chart_img.size
+    scale = min((R_W - 10) / cw, chart_area_h / ch, 1.0)
+    ncw, nch = int(cw * scale), int(ch * scale)
+    chart_img = chart_img.resize((ncw, nch), Image.LANCZOS)
+    chart_img_rgba = chart_img.convert("RGBA")
+    cx = R_X + (R_W - ncw) // 2
+    cy = C_TOP + (chart_area_h - nch) // 2
+    card.paste(chart_img_rgba, (cx, cy), chart_img_rgba)
+
+    # ── 右側下部：スコアバー（JoJo風 A〜E）──
+    bar_top   = C_TOP + chart_area_h + 8
+    bar_total = H - 28 - bar_top
+    n_rows    = 3
+    row_h     = bar_total // n_rows
+    lbl_font  = get_font(20, font_style)
+    grd_font  = get_font(22, "gothic")
+
+    for i, (label, score) in enumerate(zip(TASTE_LABELS, scores)):
+        col = i % 2
+        row = i // 2
+        bx  = R_X + col * (R_W // 2)
+        by  = bar_top + row * row_h + (row_h - 28) // 2
+        bar_w = R_W // 2 - 8
+        grade = _score_grade(score)
+
+        draw.text((bx, by + 14), label, font=lbl_font, fill=GOLD, anchor="lm")
+        bar_left = bx + 52
+        bar_right = bx + bar_w - 30
+        bar_inner = bar_right - bar_left
+        draw.rectangle([(bar_left, by + 4), (bar_right, by + 22)],
+                       fill=(40, 30, 10, 200))
+        fill_w = int(bar_inner * score / 10)
+        if fill_w > 0:
+            draw.rectangle([(bar_left, by + 4), (bar_left + fill_w, by + 22)],
+                           fill=GOLD)
+        draw.text((bx + bar_w - 22, by + 14), grade, font=grd_font,
+                  fill="#ffffff", anchor="mm")
+
+    return card.convert("RGB")
 
 
 # ════════════════════════════════════════════
@@ -529,6 +683,7 @@ def _tasting_params(data: dict):
         name_size=int(data.get("name_size", 82)),
         name_color=data.get("name_color", "#ffffff"),
         name_shadow=str(data.get("name_shadow", "true")).lower() == "true",
+        font_style=data.get("font_style", "mincho"),
     )
 
 @app.route("/preview_tasting", methods=["POST"])
@@ -539,7 +694,8 @@ def preview_tasting():
     result = generate_tasting_card(img, p["sake_name"], p["scores"],
                                     p["chart_x"], p["chart_y"], p["chart_size"],
                                     p["name_x"], p["name_y"], p["name_size"],
-                                    p["name_color"], p["name_shadow"])
+                                    p["name_color"], p["name_shadow"],
+                                    font_style=p["font_style"])
     return jsonify({"preview": _to_base64(result)})
 
 @app.route("/download_tasting", methods=["POST"])
@@ -553,10 +709,53 @@ def download_tasting():
                                     p["chart_x"], p["chart_y"], p["chart_size"],
                                     p["name_x"], p["name_y"], p["name_size"],
                                     p["name_color"], p["name_shadow"],
-                                    for_save=True)
+                                    for_save=True, font_style=p["font_style"])
     _chart_cache["key"] = None  # キャッシュをリセットして次回プレビューに戻す
     buf = io.BytesIO(); result.save(buf, "JPEG", quality=95); buf.seek(0)
     return send_file(buf, mimetype="image/jpeg", as_attachment=True, download_name="tasting.jpg")
+
+
+# ── スタンドカード ──
+@app.route("/upload_sticker", methods=["POST"])
+def upload_sticker():
+    global _sticker_bytes
+    f = request.files.get("image")
+    if not f: return jsonify({"error": "no file"}), 400
+    img = Image.open(f.stream).convert("RGBA")
+    buf = io.BytesIO(); img.save(buf, "PNG")
+    _sticker_bytes = buf.getvalue()
+    # チェッカーボード背景でプレビュー
+    checker = Image.new("RGB", img.size, (180, 180, 180))
+    checker.paste(img, mask=img.split()[3])
+    return jsonify({"preview": _to_base64(checker)})
+
+def _stand_params(data: dict):
+    scores = [float(data.get(k, 5)) for k in ["甘味","酸味","旨味","苦味","渋み","香り"]]
+    return dict(
+        sake_name=data.get("sake_name", "銘柄名"),
+        scores=scores,
+        font_style=data.get("font_style", "mincho"),
+        bg_color=data.get("bg_color", "#0a0710"),
+    )
+
+@app.route("/preview_stand", methods=["POST"])
+def preview_stand():
+    p = _stand_params(request.get_json() or {})
+    sticker = Image.open(io.BytesIO(_sticker_bytes)).convert("RGBA") if _sticker_bytes else None
+    card = generate_stand_card(sticker, p["sake_name"], p["scores"],
+                               p["font_style"], p["bg_color"])
+    return jsonify({"preview": _to_base64(card, max_h=500)})
+
+@app.route("/download_stand", methods=["POST"])
+def download_stand():
+    p = _stand_params(request.get_json() or {})
+    sticker = Image.open(io.BytesIO(_sticker_bytes)).convert("RGBA") if _sticker_bytes else None
+    _chart_cache["key"] = None
+    card = generate_stand_card(sticker, p["sake_name"], p["scores"],
+                               p["font_style"], p["bg_color"], for_save=True)
+    _chart_cache["key"] = None
+    buf = io.BytesIO(); card.save(buf, "JPEG", quality=95); buf.seek(0)
+    return send_file(buf, mimetype="image/jpeg", as_attachment=True, download_name="stand_card.jpg")
 
 
 @app.route("/generate_caption", methods=["POST"])
