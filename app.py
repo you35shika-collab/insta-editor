@@ -386,6 +386,10 @@ def generate_stand_card(
     font_style: str = "mincho",
     bg_color: str = "#0a0710",
     for_save: bool = False,
+    sticker_scale: float = 1.0,
+    sticker_angle: float = 0,
+    sticker_erode: int = 2,
+    bg_pattern: str = "none",
 ) -> Image.Image:
     """ジョジョ風スタンドカード — 横長 1080×810"""
     W, H = 1080, 810
@@ -427,12 +431,55 @@ def generate_stand_card(
     # 中央分割線
     draw.line([(DIV_X + 5, C_TOP + 8), (DIV_X + 5, H - 28)], fill=GOLD, width=1)
 
+    # ── 左側ゾーン：背景パターン ──
+    ZL, ZT, ZR, ZB = 25, C_TOP, DIV_X, H - 25   # ゾーン境界
+    ZCX, ZCY = (ZL + ZR) // 2, (ZT + ZB) // 2   # ゾーン中心
+
+    if bg_pattern in ("dots", "combined"):
+        spacing = 16
+        for ri, dy in enumerate(range(ZT + 8, ZB - 4, spacing)):
+            offset = spacing // 2 if ri % 2 else 0
+            for dx in range(ZL + 5 + offset, ZR - 4, spacing):
+                draw.ellipse([(dx, dy), (dx + 1, dy + 1)], fill=(150, 120, 50, 45))
+
+    if bg_pattern == "hatch":
+        zone_w, zone_h = ZR - ZL, ZB - ZT
+        for offset in range(-zone_h, zone_w + zone_h, 18):
+            x1, y1 = ZL, ZT + offset
+            x2, y2 = ZR, ZT + offset + zone_w
+            if y1 < ZT: x1 += ZT - y1; y1 = ZT
+            if y2 > ZB: x2 -= y2 - ZB; y2 = ZB
+            if x1 < ZR and x2 > ZL and y1 <= y2:
+                draw.line([(x1, y1), (x2, y2)], fill=(100, 80, 30, 35), width=1)
+
+    if bg_pattern in ("glow", "combined"):
+        from PIL import ImageFilter as _IF
+        gw, gh = (ZR - ZL) // 2 + 20, (ZB - ZT) // 2 + 20
+        glow = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+        ImageDraw.Draw(glow).ellipse(
+            [(ZCX - gw, ZCY - gh), (ZCX + gw, ZCY + gh)],
+            fill=(140, 110, 45, 100)
+        )
+        glow = glow.filter(_IF.GaussianBlur(radius=55))
+        card = Image.alpha_composite(card, glow)
+        draw = ImageDraw.Draw(card)   # compositeでdrawを作り直す
+
     # ── 左側：ステッカー ──
     if sticker:
         st = sticker.convert("RGBA")
+        # 透明パディングをトリム（アルファchのみで判定 — RGB値が残っていても誤検知しない）
+        alpha_bbox = st.split()[3].getbbox()
+        if alpha_bbox:
+            st = st.crop(alpha_bbox)
+        # エッジ処理（erode=0のときはスキップ）
+        if sticker_erode > 0:
+            st = _clean_sticker_alpha(st, erode_px=sticker_erode)
+        if sticker_angle != 0:
+            st = st.rotate(-sticker_angle, expand=True, resample=Image.BICUBIC)
         sw, sh = st.size
         max_w, max_h = L_W - 20, C_H - 10
-        scale = min(max_w / sw, max_h / sh, 1.0)
+        base_scale = min(max_w / sw, max_h / sh)   # エリアにフィットするスケール
+        scale = base_scale * sticker_scale          # ユーザー調整を乗算
         nw, nh = int(sw * scale), int(sh * scale)
         st = st.resize((nw, nh), Image.LANCZOS)
         sx = 25 + (max_w - nw) // 2 + 10
@@ -716,6 +763,26 @@ def download_tasting():
 
 
 # ── スタンドカード ──
+def _clean_sticker_alpha(img: Image.Image, erode_px: int = 2) -> Image.Image:
+    """iPhoneの切り抜き画像の白縁・ガタつきを除去する"""
+    from PIL import ImageFilter
+    if erode_px == 0:
+        return img.convert("RGBA")
+    img = img.convert("RGBA")
+    r, g, b, a = img.split()
+    # Step1: 閾値処理 — 半透明ピクセル（白縁フリンジ）だけをゼロにする
+    # MinFilterと違いボトルネックのような細い部分を破壊しない
+    threshold = min(erode_px * 15, 230)
+    a = a.point(lambda x: 0 if x < threshold else x)
+    # Step2: 少量のMinFilter（強めの設定のみ）— 完全に不透明な縁取りを削る
+    erosion_rounds = max(0, (erode_px - 3) // 3)   # 4以上で1ラウンド増加
+    for _ in range(erosion_rounds):
+        a = a.filter(ImageFilter.MinFilter(3))
+    # Step3: GaussianBlurでエッジを滑らかに
+    a = a.filter(ImageFilter.GaussianBlur(radius=min(erode_px * 0.3, 2.0)))
+    img.putalpha(a)
+    return img
+
 @app.route("/upload_sticker", methods=["POST"])
 def upload_sticker():
     global _sticker_bytes
@@ -723,7 +790,7 @@ def upload_sticker():
     if not f: return jsonify({"error": "no file"}), 400
     img = Image.open(f.stream).convert("RGBA")
     buf = io.BytesIO(); img.save(buf, "PNG")
-    _sticker_bytes = buf.getvalue()
+    _sticker_bytes = buf.getvalue()           # 原画をそのまま保存（エッジ処理はカード生成時）
     # チェッカーボード背景でプレビュー
     checker = Image.new("RGB", img.size, (180, 180, 180))
     checker.paste(img, mask=img.split()[3])
@@ -736,6 +803,10 @@ def _stand_params(data: dict):
         scores=scores,
         font_style=data.get("font_style", "mincho"),
         bg_color=data.get("bg_color", "#0a0710"),
+        sticker_scale=float(data.get("sticker_scale", 100)) / 100.0,
+        sticker_angle=float(data.get("sticker_angle", 0)),
+        sticker_erode=int(data.get("sticker_erode", 2)),
+        bg_pattern=data.get("bg_pattern", "none"),
     )
 
 @app.route("/preview_stand", methods=["POST"])
@@ -743,7 +814,9 @@ def preview_stand():
     p = _stand_params(request.get_json() or {})
     sticker = Image.open(io.BytesIO(_sticker_bytes)).convert("RGBA") if _sticker_bytes else None
     card = generate_stand_card(sticker, p["sake_name"], p["scores"],
-                               p["font_style"], p["bg_color"])
+                               p["font_style"], p["bg_color"],
+                               sticker_scale=p["sticker_scale"], sticker_angle=p["sticker_angle"],
+                               sticker_erode=p["sticker_erode"], bg_pattern=p["bg_pattern"])
     return jsonify({"preview": _to_base64(card, max_h=500)})
 
 @app.route("/download_stand", methods=["POST"])
@@ -752,7 +825,9 @@ def download_stand():
     sticker = Image.open(io.BytesIO(_sticker_bytes)).convert("RGBA") if _sticker_bytes else None
     _chart_cache["key"] = None
     card = generate_stand_card(sticker, p["sake_name"], p["scores"],
-                               p["font_style"], p["bg_color"], for_save=True)
+                               p["font_style"], p["bg_color"], for_save=True,
+                               sticker_scale=p["sticker_scale"], sticker_angle=p["sticker_angle"],
+                               sticker_erode=p["sticker_erode"], bg_pattern=p["bg_pattern"])
     _chart_cache["key"] = None
     buf = io.BytesIO(); card.save(buf, "JPEG", quality=95); buf.seek(0)
     return send_file(buf, mimetype="image/jpeg", as_attachment=True, download_name="stand_card.jpg")

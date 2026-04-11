@@ -273,6 +273,30 @@
       <div id="stickerPh">📱 ステッカーを追加<br><small>iPhoneで切り抜いた透過PNG</small></div>
     </div>
     <input type="file" id="stickerFile" accept="image/*" style="display:none" onchange="sUploadSticker(this.files[0])">
+    <!-- ステッカー調整スライダー -->
+    <div id="stickerAdjust" style="display:none;margin-top:8px;padding:10px;border:1px solid var(--border);border-radius:10px;">
+      <div class="row" style="margin-bottom:6px">
+        <span class="lbl">サイズ</span>
+        <input type="range" id="sticker_scale" min="30" max="200" step="5" value="100"
+               oninput="document.getElementById('sv_scale').textContent=this.value+'%'"
+               onchange="sOnRelease()">
+        <span id="sv_scale" style="width:38px;text-align:right;font-size:12px;color:var(--muted)">100%</span>
+      </div>
+      <div class="row" style="margin-bottom:6px">
+        <span class="lbl">角度</span>
+        <input type="range" id="sticker_angle" min="-90" max="90" step="2" value="0"
+               oninput="document.getElementById('sv_angle').textContent=this.value+'°'"
+               onchange="sOnRelease()">
+        <span id="sv_angle" style="width:38px;text-align:right;font-size:12px;color:var(--muted)">0°</span>
+      </div>
+      <div class="row">
+        <span class="lbl">エッジ補正</span>
+        <input type="range" id="sticker_erode" min="0" max="12" step="1" value="2"
+               oninput="document.getElementById('sv_erode').textContent=this.value"
+               onchange="sOnRelease()">
+        <span id="sv_erode" style="width:38px;text-align:right;font-size:12px;color:var(--muted)">2</span>
+      </div>
+    </div>
     <div class="btn-row" style="margin-top:8px">
       <button class="btn" onclick="sDoPreview()">👁 プレビュー</button>
       <button class="btn" onclick="sClearSticker()">✕ ステッカー削除</button>
@@ -293,7 +317,7 @@
         <div class="taste-item"><div class="taste-lbl">香り <span id="sv香り">5</span></div><input type="range" data-key="香り" min="1" max="10" step="1" value="5" oninput="ssl(this)" onchange="sOnRelease()"></div>
       </div>
     </div>
-    <div class="sec"><div class="sec-title">🔤 フォント / 背景色</div>
+    <div class="sec"><div class="sec-title">🔤 フォント / 背景</div>
       <div class="row"><span class="lbl">フォント</span>
         <select id="s_font" onchange="sOnRelease()" style="flex:1;padding:8px;background:var(--card);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;">
           <option value="mincho">明朝体（推奨）</option>
@@ -301,6 +325,15 @@
         </select>
       </div>
       <div class="row"><span class="lbl">背景色</span><input type="color" id="s_bg" value="#0a0710" onchange="sOnRelease()"></div>
+      <div class="row"><span class="lbl">背景柄</span>
+        <select id="s_bg_pattern" onchange="sOnRelease()" style="flex:1;padding:8px;background:var(--card);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;">
+          <option value="none">なし</option>
+          <option value="dots">A. ドットグリッド</option>
+          <option value="hatch">B. 斜線ハッチング</option>
+          <option value="glow">C. ラジアルグロー</option>
+          <option value="combined">D. 組み合わせ（ドット＋グロー）</option>
+        </select>
+      </div>
     </div>
     <div class="sec"><div class="sec-title">✍️ キャプション自動生成</div>
       <button class="btn-auto" id="sCapBtn" onclick="genCaption('stand')" style="margin-bottom:8px">
@@ -509,7 +542,10 @@ function sGetParams(){
   const scores={};
   document.querySelectorAll("#tab-stand input[data-key]").forEach(el=>scores[el.dataset.key]=parseFloat(el.value));
   const g=id=>document.getElementById(id);
-  return{sake_name:g("s_name").value||"銘柄名",...scores,font_style:g("s_font").value,bg_color:g("s_bg").value};
+  return{sake_name:g("s_name").value||"銘柄名",...scores,font_style:g("s_font").value,bg_color:g("s_bg").value,
+    bg_pattern:g("s_bg_pattern")?.value||"none",
+    sticker_scale:parseFloat(g("sticker_scale")?.value||100),sticker_angle:parseFloat(g("sticker_angle")?.value||0),
+    sticker_erode:parseInt(g("sticker_erode")?.value||2)};
 }
 async function sUploadSticker(file){
   if(!file)return; spin(true);
@@ -520,6 +556,7 @@ async function sUploadSticker(file){
     document.getElementById("stickerPrevImg").src="data:image/jpeg;base64,"+d.preview;
     document.getElementById("stickerPrevWrap").style.display="block";
     document.getElementById("stickerPh").style.display="none";
+    document.getElementById("stickerAdjust").style.display="block";
     toast("✅ ステッカーを追加しました");
     sDoPreview();
   }
@@ -527,6 +564,10 @@ async function sUploadSticker(file){
 function sClearSticker(){
   document.getElementById("stickerPrevWrap").style.display="none";
   document.getElementById("stickerPh").style.display="block";
+  document.getElementById("stickerAdjust").style.display="none";
+  document.getElementById("sticker_scale").value=100; document.getElementById("sv_scale").textContent="100%";
+  document.getElementById("sticker_angle").value=0;   document.getElementById("sv_angle").textContent="0°";
+  document.getElementById("sticker_erode").value=2;   document.getElementById("sv_erode").textContent="2";
   fetch("/upload_sticker",{method:"POST",body:new FormData()}); // サーバーのステッカーをクリア（空で送信）
 }
 function sOnRelease(){ sDoPreview(); }
