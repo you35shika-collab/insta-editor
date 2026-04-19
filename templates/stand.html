@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+  <title>🍶 NIHONSHU STAND CARD</title>
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{
+      --bg:#0a0a0a;--card:#181818;--border:#2c2c2c;
+      --gold:#c9a96e;--text:#f0f0f0;--muted:#777;
+    }
+    body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",sans-serif;font-size:14px;min-height:100vh;}
+
+    header{background:var(--card);border-bottom:1px solid var(--border);padding:12px 20px;display:flex;align-items:center;gap:10px;position:sticky;top:0;z-index:100;}
+    header h1{font-size:15px;font-weight:700;color:var(--gold);letter-spacing:.05em;}
+    header p{font-size:11px;color:var(--muted);margin-left:auto;}
+
+    .layout{display:flex;min-height:calc(100vh - 52px);}
+    .left{width:320px;flex-shrink:0;padding:16px;border-right:1px solid var(--border);display:flex;flex-direction:column;gap:12px;overflow-y:auto;}
+    .right{flex:1;padding:20px;display:flex;flex-direction:column;align-items:center;gap:16px;}
+
+    /* プレビュー */
+    .preview-wrap{width:100%;max-width:560px;}
+    .preview{width:100%;aspect-ratio:4/3;border:2px dashed var(--border);border-radius:12px;display:flex;align-items:center;justify-content:center;overflow:hidden;background:var(--card);position:relative;transition:border-color .2s;}
+    .preview.loaded{border-style:solid;border-color:var(--border);}
+    .preview img{width:100%;height:100%;object-fit:contain;display:none;}
+    .preview.loaded img{display:block;}
+    .preview .ph{color:var(--muted);text-align:center;font-size:13px;line-height:2;}
+    .preview.loaded .ph{display:none;}
+    .preview .loading-ring{display:none;position:absolute;width:36px;height:36px;border:3px solid var(--border);border-top-color:var(--gold);border-radius:50%;animation:spin .7s linear infinite;}
+    .preview.updating .loading-ring{display:block;}
+    .preview.updating img{opacity:.3;}
+    @keyframes spin{to{transform:rotate(360deg)}}
+
+    /* ボタン */
+    .btn-dl{width:100%;max-width:560px;padding:14px;border:none;border-radius:10px;background:linear-gradient(135deg,var(--gold),#a07840);color:#000;font-size:15px;font-weight:700;cursor:pointer;transition:.15s;}
+    .btn-dl:disabled{opacity:.35;cursor:default;}
+    .btn-dl:active{transform:scale(.97);}
+
+    /* ステッカーアップロード */
+    .upload-area{border:2px dashed var(--border);border-radius:10px;padding:16px;text-align:center;cursor:pointer;transition:.2s;background:var(--card);}
+    .upload-area:hover{border-color:var(--gold);}
+    .upload-area.has-img{border-style:solid;border-color:var(--border);}
+    .upload-area img{max-height:80px;border-radius:6px;margin-bottom:6px;}
+    .upload-hint{font-size:11px;color:var(--muted);line-height:1.6;}
+
+    /* セクション */
+    .sec{display:flex;flex-direction:column;gap:8px;}
+    .sec-title{font-size:10px;font-weight:700;letter-spacing:.08em;color:var(--gold);text-transform:uppercase;padding-bottom:5px;border-bottom:1px solid var(--border);}
+    .row{display:flex;align-items:center;gap:8px;}
+    .lbl{width:60px;flex-shrink:0;font-size:12px;color:var(--muted);}
+    input[type=range]{flex:1;-webkit-appearance:none;height:4px;background:var(--border);border-radius:2px;outline:none;touch-action:none;}
+    input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:24px;height:24px;border-radius:50%;background:var(--gold);cursor:pointer;}
+    .val{width:28px;text-align:right;font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums;}
+    input[type=text]{width:100%;padding:9px 12px;background:var(--card);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:14px;outline:none;font-family:inherit;}
+    input[type=text]:focus{border-color:var(--gold);}
+    input[type=color]{width:38px;height:32px;border:none;border-radius:6px;cursor:pointer;padding:2px;background:var(--card);}
+    select{flex:1;padding:8px 10px;background:var(--card);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;outline:none;}
+    select:focus{border-color:var(--gold);}
+
+    .taste-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+    .taste-item{display:flex;flex-direction:column;gap:3px;}
+    .taste-lbl{font-size:11px;color:var(--muted);display:flex;justify-content:space-between;align-items:center;}
+    .taste-lbl span{color:var(--gold);font-weight:700;font-size:13px;}
+
+    #toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(60px);background:#222;color:white;padding:10px 20px;border-radius:24px;font-size:13px;opacity:0;transition:opacity .3s,transform .3s;z-index:999;}
+    #toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+
+    @media(max-width:680px){
+      .layout{flex-direction:column;}
+      .left{width:100%;border-right:none;border-bottom:1px solid var(--border);}
+      .taste-grid{grid-template-columns:1fr;}
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <span style="font-size:20px">🍶</span>
+  <h1>NIHONSHU STAND CARD</h1>
+  <p>日本酒テイスティングカード</p>
+</header>
+
+<div class="layout">
+  <!-- ── 左：コントロール ── -->
+  <div class="left">
+
+    <!-- ステッカー -->
+    <div class="sec">
+      <div class="sec-title">写真・ステッカー</div>
+      <div class="upload-area" id="stickerZone" onclick="document.getElementById('stickerFile').click()">
+        <img id="stickerThumb" style="display:none">
+        <div class="upload-hint">📷 写真をタップしてアップロード<br>（iPhoneの切り抜き画像対応）</div>
+      </div>
+      <input type="file" id="stickerFile" accept="image/*" style="display:none" onchange="uploadSticker(this.files[0])">
+    </div>
+
+    <!-- 銘柄名 -->
+    <div class="sec">
+      <div class="sec-title">銘柄名</div>
+      <input type="text" id="sakeName" placeholder="例：獺祭" value="獺祭" oninput="schedulePreview()">
+    </div>
+
+    <!-- テイスティングスコア -->
+    <div class="sec">
+      <div class="sec-title">テイスティングスコア（1〜10）</div>
+      <div class="taste-grid" id="tasteGrid"></div>
+    </div>
+
+    <!-- スタイル -->
+    <div class="sec">
+      <div class="sec-title">スタイル</div>
+      <div class="row">
+        <span class="lbl">フォント</span>
+        <select id="fontStyle" onchange="schedulePreview()">
+          <option value="mincho">明朝体</option>
+          <option value="gothic">ゴシック体</option>
+        </select>
+      </div>
+      <div class="row">
+        <span class="lbl">背景色</span>
+        <input type="color" id="bgColor" value="#0a0710" oninput="schedulePreview()">
+        <span style="font-size:11px;color:var(--muted);margin-left:4px">背景パターン</span>
+        <select id="bgPattern" onchange="schedulePreview()" style="flex:1">
+          <option value="none">なし</option>
+          <option value="dots">ドット</option>
+          <option value="hatch">ハッチ</option>
+          <option value="glow">グロー</option>
+          <option value="combined">ドット+グロー</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- ステッカー調整 -->
+    <div class="sec">
+      <div class="sec-title">写真の調整</div>
+      <div class="row">
+        <span class="lbl">サイズ</span>
+        <input type="range" id="stickerScale" min="50" max="150" value="100" oninput="this.nextElementSibling.textContent=this.value+'%';schedulePreview()">
+        <span class="val">100%</span>
+      </div>
+      <div class="row">
+        <span class="lbl">角度</span>
+        <input type="range" id="stickerAngle" min="-30" max="30" value="0" oninput="this.nextElementSibling.textContent=this.value+'°';schedulePreview()">
+        <span class="val">0°</span>
+      </div>
+      <div class="row">
+        <span class="lbl">縁取り</span>
+        <input type="range" id="stickerErode" min="0" max="8" value="2" oninput="this.nextElementSibling.textContent=this.value;schedulePreview()">
+        <span class="val">2</span>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ── 右：プレビュー ── -->
+  <div class="right">
+    <div class="preview-wrap">
+      <div class="preview" id="previewBox">
+        <img id="previewImg" alt="プレビュー">
+        <div class="loading-ring"></div>
+        <div class="ph">⬅️ 左のパネルで設定して<br>プレビューを生成します</div>
+      </div>
+    </div>
+    <button class="btn-dl" id="dlBtn" onclick="download()" disabled>⬇️ ダウンロード（1080×810px）</button>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ── スコアスライダー生成 ──
+const LABELS = ["甘味","酸味","旨味","苦味","渋み","香り"];
+const grid = document.getElementById("tasteGrid");
+LABELS.forEach(lbl => {
+  const item = document.createElement("div");
+  item.className = "taste-item";
+  item.innerHTML = `
+    <div class="taste-lbl">${lbl}<span id="v_${lbl}">5</span></div>
+    <input type="range" id="s_${lbl}" min="1" max="10" value="5"
+      oninput="document.getElementById('v_${lbl}').textContent=this.value;schedulePreview()">
+  `;
+  grid.appendChild(item);
+});
+
+// ── ステッカーアップロード ──
+async function uploadSticker(file) {
+  if (!file) return;
+  const fd = new FormData();
+  fd.append("image", file);
+  try {
+    const res = await fetch("/upload_sticker", {method:"POST", body:fd});
+    const d = await res.json();
+    if (d.preview) {
+      const thumb = document.getElementById("stickerThumb");
+      thumb.src = "data:image/jpeg;base64," + d.preview;
+      thumb.style.display = "block";
+      document.querySelector("#stickerZone .upload-hint").textContent = "タップして変更";
+      document.getElementById("stickerZone").classList.add("has-img");
+    }
+    schedulePreview();
+  } catch(e) { toast("アップロードに失敗しました"); }
+}
+
+// ── プレビュー（デバウンス付き） ──
+let _timer = null;
+function schedulePreview() {
+  clearTimeout(_timer);
+  _timer = setTimeout(doPreview, 350);
+}
+
+function getParams() {
+  const p = {
+    name: document.getElementById("sakeName").value || "銘柄名",
+    font_style: document.getElementById("fontStyle").value,
+    bg_color: document.getElementById("bgColor").value,
+    bg_pattern: document.getElementById("bgPattern").value,
+    sticker_scale: document.getElementById("stickerScale").value,
+    sticker_angle: document.getElementById("stickerAngle").value,
+    sticker_erode: document.getElementById("stickerErode").value,
+  };
+  LABELS.forEach(lbl => p[lbl] = document.getElementById("s_"+lbl).value);
+  return p;
+}
+
+async function doPreview() {
+  const box = document.getElementById("previewBox");
+  box.classList.add("updating");
+  try {
+    const res = await fetch("/preview_stand", {
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body: JSON.stringify(getParams())
+    });
+    const d = await res.json();
+    if (d.preview) {
+      const img = document.getElementById("previewImg");
+      img.src = "data:image/jpeg;base64," + d.preview;
+      box.classList.add("loaded");
+      document.getElementById("dlBtn").disabled = false;
+    }
+  } catch(e) { toast("プレビューに失敗しました"); }
+  finally { box.classList.remove("updating"); }
+}
+
+async function download() {
+  try {
+    const res = await fetch("/download_stand", {
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body: JSON.stringify(getParams())
+    });
+    const blob = await res.blob();
+    const url  = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = "stand_card.jpg"; a.click();
+    URL.revokeObjectURL(url);
+    toast("ダウンロード完了！");
+  } catch(e) { toast("ダウンロードに失敗しました"); }
+}
+
+function toast(msg) {
+  const t = document.getElementById("toast");
+  t.textContent = msg; t.classList.add("show");
+  setTimeout(() => t.classList.remove("show"), 2500);
+}
+
+// 初期プレビュー
+schedulePreview();
+</script>
+</body>
+</html>
