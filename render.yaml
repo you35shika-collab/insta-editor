@@ -3,7 +3,7 @@ services:
     name: nihonshu-stand
     env: python
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn app_public:app
+    startCommand: gunicorn app_public:app --timeout 120 --workers 1
     envVars:
       - key: SECRET_KEY
         generateValue: true

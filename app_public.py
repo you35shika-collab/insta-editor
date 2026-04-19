@@ -21,6 +21,7 @@ from PIL import Image, ImageDraw, ImageFilter, ImageFont, ImageOps
 
 app = Flask(__name__, template_folder="templates")
 app.secret_key = os.environ.get("SECRET_KEY", secrets.token_hex(32))
+app.config["MAX_CONTENT_LENGTH"] = 20 * 1024 * 1024  # 20MB上限
 
 # ── セッションごとの一時ストレージ ──
 _SESSION_DIR = os.path.join(tempfile.gettempdir(), "standcard_sessions")
